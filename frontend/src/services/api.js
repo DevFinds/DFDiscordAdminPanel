@@ -26,6 +26,11 @@ export const servers = {
   getOne: (guildId) => api.get(`/api/servers/${guildId}`)
 };
 
+export const guild = {
+  getRoles: (guildId) => api.get(`/api/settings/${guildId}/roles`),
+  getChannels: (guildId) => api.get(`/api/settings/${guildId}/channels`)
+};
+
 export const settings = {
   updateWelcome: (guildId, data) => api.put(`/api/settings/${guildId}/welcome`, data),
   updateAutoRole: (guildId, data) => api.put(`/api/settings/${guildId}/autorole`, data),
