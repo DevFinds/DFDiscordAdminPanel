@@ -1,0 +1,305 @@
+/* Input Component Styles */
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input-wrapper--full-width {
+  width: 100%;
+}
+
+.input-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  line-height: var(--line-height-snug);
+}
+
+.input-label__required {
+  color: var(--error);
+  margin-left: var(--space-1);
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  /* Base styles */
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+  transition: all var(--duration-fast) var(--ease-out);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input:focus {
+  border-color: var(--border-interactive);
+  box-shadow: var(--shadow-focus);
+  background-color: var(--surface-overlay);
+}
+
+.input:hover:not(:focus):not(.input--disabled) {
+  border-color: var(--border-strong);
+  background-color: var(--surface-overlay);
+}
+
+/* Sizes */
+.input--xs {
+  height: var(--input-height-xs);
+  padding-left: var(--input-padding-x-xs);
+  padding-right: var(--input-padding-x-xs);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-md);
+}
+
+.input--sm {
+  height: var(--input-height-sm);
+  padding-left: var(--input-padding-x-sm);
+  padding-right: var(--input-padding-x-sm);
+  font-size: var(--font-size-xs);
+}
+
+.input--md {
+  height: var(--input-height-md);
+  padding-left: var(--input-padding-x-md);
+  padding-right: var(--input-padding-x-md);
+  font-size: var(--font-size-sm);
+}
+
+.input--lg {
+  height: var(--input-height-lg);
+  padding-left: var(--input-padding-x-lg);
+  padding-right: var(--input-padding-x-lg);
+  font-size: var(--font-size-base);
+}
+
+.input--xl {
+  height: var(--input-height-xl);
+  padding-left: var(--input-padding-x-xl);
+  padding-right: var(--input-padding-x-xl);
+  font-size: var(--font-size-lg);
+}
+
+/* States */
+.input--error {
+  border-color: var(--border-error);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.input--error:focus {
+  border-color: var(--border-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.input--success {
+  border-color: var(--border-success);
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.input--success:focus {
+  border-color: var(--border-success);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.input--disabled {
+  background-color: var(--interactive-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  border-color: var(--border-subtle);
+}
+
+.input--disabled::placeholder {
+  color: var(--text-disabled);
+}
+
+/* Icon styles */
+.input--has-left-icon {
+  padding-left: 2.5rem;
+}
+
+.input--has-right-icon {
+  padding-right: 2.5rem;
+}
+
+.input-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.input-icon--left {
+  left: var(--space-3);
+}
+
+.input-icon--right {
+  right: var(--space-3);
+}
+
+.input-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Size-specific icon positioning */
+.input--xs .input-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.input--xs .input-icon--left {
+  left: var(--space-2);
+}
+
+.input--xs .input-icon--right {
+  right: var(--space-2);
+}
+
+.input--xs.input--has-left-icon {
+  padding-left: 2rem;
+}
+
+.input--xs.input--has-right-icon {
+  padding-right: 2rem;
+}
+
+.input--sm .input-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.input--lg .input-icon {
+  left: var(--space-4);
+  right: var(--space-4);
+}
+
+.input--lg .input-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.input--lg.input--has-left-icon {
+  padding-left: 3rem;
+}
+
+.input--lg.input--has-right-icon {
+  padding-right: 3rem;
+}
+
+.input--xl .input-icon {
+  left: var(--space-5);
+  right: var(--space-5);
+}
+
+.input--xl .input-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.input--xl.input--has-left-icon {
+  padding-left: 3.5rem;
+}
+
+.input--xl.input--has-right-icon {
+  padding-right: 3.5rem;
+}
+
+/* Helper text */
+.input-help {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  line-height: var(--line-height-snug);
+  margin-top: var(--space-1);
+}
+
+.input-help--error {
+  color: var(--text-error);
+}
+
+/* Width utilities */
+.input--full-width {
+  width: 100%;
+}
+
+/* Focus states update icon color */
+.input-container:focus-within .input-icon {
+  color: var(--text-secondary);
+}
+
+.input--error:focus + .input-icon,
+.input--error ~ .input-icon {
+  color: var(--text-error);
+}
+
+.input--success:focus + .input-icon,
+.input--success ~ .input-icon {
+  color: var(--text-success);
+}
+
+/* Special input types */
+input[type="search"].input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+input[type="search"].input::-webkit-search-decoration,
+input[type="search"].input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+input[type="number"].input {
+  -moz-appearance: textfield;
+}
+
+input[type="number"].input::-webkit-outer-spin-button,
+input[type="number"].input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Auto-fill styles */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px var(--surface-elevated) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  border-color: var(--border-interactive);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .input {
+    min-height: 44px; /* Minimum touch target */
+  }
+  
+  .input--xs {
+    min-height: 36px;
+  }
+  
+  .input--sm {
+    min-height: 40px;
+  }
+}
