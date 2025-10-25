@@ -71,6 +71,17 @@ const GuildSchema = new mongoose.Schema({
         default: []
       },
       title: String,
+      initialBackfill: {
+        type: Number,
+        default: 3,
+        min: 0,
+        max: 20
+      },
+      backfilled: {
+        type: Boolean,
+        default: false
+      },
+      galleryFragment: String,
       createdAt: {
         type: Date,
         default: Date.now
