@@ -1,9 +1,9 @@
 {
   "name": "devfinds-discord-admin-panel-frontend",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "DevFinds Discord Admin Panel - Modern React frontend for Discord server management",
   "private": true,
-  "homepage": ".",
+  "homepage": "/",
   "author": "DevFinds <findsdev@gmail.com>",
   "keywords": ["discord", "admin-panel", "react", "bot", "server-management", "devfinds"],
   "dependencies": {
