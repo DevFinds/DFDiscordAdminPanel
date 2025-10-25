@@ -10,7 +10,7 @@ let cheerio;
 try {
   cheerio = require('cheerio');
 } catch (err) {
-  console.warn('Cheerio not available, using fallback parsing');
+  console.warn('⚠️ Cheerio not available, using fallback parsing');
   cheerio = null;
 }
 
@@ -240,164 +240,296 @@ function extractGalleryFragment(pageUrl) {
   return match ? match[1] : null;
 }
 
-// Fallback: create simple post from page URL
-function createFallbackPost(pageUrl, pageId) {
-  return {
-    id: pageId,
-    title: `Buildin Post ${pageId.substring(0, 6)}`,
-    url: pageUrl,
-    shareUrl: pageUrl.includes('/share/') ? pageUrl : `https://buildin.ai/share/${pageId}`
-  };
-}
-
-// Fetch Buildin gallery page and extract posts
+// Enhanced Buildin gallery parser
 async function fetchBuildinGalleryPosts(pageUrl, galleryFragment) {
   try {
     const pageId = extractPageId(pageUrl);
-    if (!pageId) return [];
+    if (!pageId) {
+      console.log('⚠️ No valid page ID found in URL:', pageUrl);
+      return [];
+    }
     
     const shareUrl = `https://buildin.ai/share/${pageId}`;
-    console.log(`🚀 Fetching Buildin gallery: ${shareUrl}`);
+    console.log(`🚀 Fetching Buildin gallery: ${shareUrl}${galleryFragment ? `#${galleryFragment}` : ''}`);
     
     const response = await axios.get(shareUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
       },
-      timeout: 15000
+      timeout: 15000,
+      maxRedirects: 5
     });
+    
+    console.log(`📊 Received response: ${response.status} ${response.statusText}, size: ${response.data.length} chars`);
     
     const posts = [];
     
     if (cheerio) {
-      // Try HTML parsing with cheerio
       const $ = cheerio.load(response.data);
       
-      // Look for various patterns that might be posts
-      const selectors = [
-        'a[href*="buildin.ai"]',
-        '[href*="/share/"]',
-        '[class*="post"], [class*="card"], [class*="item"]',
-        'h1, h2, h3, h4'
-      ];
-      
-      for (const selector of selectors) {
-        $(selector).each((i, el) => {
-          const $el = $(el);
-          const link = $el.attr('href') || $el.find('a').attr('href');
-          const title = $el.text().trim() || $el.attr('title') || $el.find('[class*="title"]').text().trim();
-          
-          if (title && title.length > 5 && title.length < 200) {
-            const postId = link ? extractPageId(link) : `text-${Date.now()}-${i}`;
-            const postUrl = link && link.includes('buildin.ai') ? link : shareUrl;
+      // Strategy 1: Look for gallery-specific fragment content
+      if (galleryFragment) {
+        console.log(`🔍 Looking for gallery fragment: ${galleryFragment}`);
+        
+        // Try to find elements with the fragment ID or data attributes
+        const fragmentSelectors = [
+          `[id*="${galleryFragment}"]`,
+          `[data-id*="${galleryFragment}"]`,
+          `[data-fragment*="${galleryFragment}"]`,
+          `[href*="${galleryFragment}"]`
+        ];
+        
+        for (const selector of fragmentSelectors) {
+          const fragmentElements = $(selector);
+          if (fragmentElements.length > 0) {
+            console.log(`✅ Found ${fragmentElements.length} fragment elements with selector: ${selector}`);
             
-            posts.push({
-              id: postId || `generated-${Date.now()}-${i}`,
-              title: title.substring(0, 100),
-              url: postUrl,
-              shareUrl: postUrl.includes('/share/') ? postUrl : `https://buildin.ai/share/${postId || pageId}`
+            fragmentElements.each((i, el) => {
+              const $el = $(el);
+              const text = $el.text().trim();
+              if (text && text.length > 10 && text.length < 200) {
+                posts.push({
+                  id: `fragment-${galleryFragment}-${i}`,
+                  title: text.substring(0, 80),
+                  url: shareUrl,
+                  shareUrl: shareUrl,
+                  source: `fragment-${selector}`
+                });
+              }
             });
+            
+            if (posts.length > 0) break;
           }
+        }
+      }
+      
+      // Strategy 2: Look for post cards/items in various patterns
+      if (posts.length === 0) {
+        console.log('🔍 Searching for post cards/items...');
+        
+        const cardSelectors = [
+          '[class*="post"] h1, [class*="post"] h2, [class*="post"] h3',
+          '[class*="card"] h1, [class*="card"] h2, [class*="card"] h3',
+          '[class*="item"] h1, [class*="item"] h2, [class*="item"] h3',
+          '[class*="entry"] h1, [class*="entry"] h2, [class*="entry"] h3',
+          'article h1, article h2, article h3',
+          '.title, [class*="title"]',
+          'h1, h2, h3, h4'
+        ];
+        
+        for (const selector of cardSelectors) {
+          $(selector).each((i, el) => {
+            const $el = $(el);
+            const title = $el.text().trim();
+            const $link = $el.closest('a').length > 0 ? $el.closest('a') : $el.find('a').first();
+            const link = $link.attr('href');
+            
+            if (title && title.length > 10 && title.length < 200) {
+              const postId = link ? extractPageId(link) : null;
+              const postUrl = link && link.includes('buildin.ai') ? link : shareUrl;
+              const sharePostUrl = postUrl.includes('/share/') ? postUrl : 
+                (postId ? `https://buildin.ai/share/${postId}` : shareUrl);
+              
+              posts.push({
+                id: postId || `title-${Date.now()}-${i}`,
+                title: title.substring(0, 100),
+                url: postUrl,
+                shareUrl: sharePostUrl,
+                source: `card-${selector}`
+              });
+            }
+          });
+          
+          if (posts.length > 0) {
+            console.log(`✅ Found ${posts.length} posts with selector: ${selector}`);
+            break;
+          }
+        }
+      }
+      
+      // Strategy 3: Look for any meaningful text content
+      if (posts.length === 0) {
+        console.log('🔍 Fallback: extracting meaningful text content...');
+        
+        const textElements = $('p, div, span').filter((i, el) => {
+          const text = $(el).text().trim();
+          return text.length > 20 && text.length < 200 && 
+                 !text.includes('©') && !text.includes('Terms') && 
+                 !text.includes('Privacy') && !text.includes('buildin.ai');
         });
         
-        if (posts.length > 0) break; // Found posts with this selector
+        textElements.slice(0, 5).each((i, el) => {
+          const title = $(el).text().trim();
+          posts.push({
+            id: `text-${Date.now()}-${i}`,
+            title: title.substring(0, 80),
+            url: shareUrl,
+            shareUrl: shareUrl,
+            source: 'text-content'
+          });
+        });
       }
     }
     
-    // Fallback: create at least one post from the page itself
+    // Final fallback: create at least one post from the page itself
     if (posts.length === 0) {
-      console.log(`🚀 Using fallback post creation for ${pageUrl}`);
-      posts.push(createFallbackPost(pageUrl, pageId));
+      console.log('🚀 Using ultimate fallback: creating post from page URL');
+      posts.push({
+        id: pageId,
+        title: `Buildin Post ${pageId.substring(0, 8)}`,
+        url: shareUrl,
+        shareUrl: shareUrl,
+        source: 'fallback'
+      });
     }
     
-    // Remove duplicates and limit
+    // Remove duplicates and limit results
     const uniquePosts = posts.filter((post, index, self) => 
       index === self.findIndex(p => p.id === post.id || p.title === post.title)
-    ).slice(0, 10);
+    ).slice(0, 15);
     
-    console.log(`🚀 Extracted ${uniquePosts.length} posts from Buildin gallery`);
+    console.log(`📝 Final result: ${uniquePosts.length} unique posts extracted`);
+    uniquePosts.forEach((post, i) => {
+      console.log(`  ${i + 1}. "${post.title}" (${post.source})`);
+    });
+    
     return uniquePosts;
     
   } catch (error) {
-    console.error(`Error fetching Buildin gallery ${pageUrl}:`, error.message);
+    console.error(`❌ Error fetching Buildin gallery ${pageUrl}:`, error.message);
     
     // Always return fallback post so something gets published
     const pageId = extractPageId(pageUrl);
     if (pageId) {
-      return [createFallbackPost(pageUrl, pageId)];
+      console.log('🚀 Error fallback: creating single post from page ID');
+      return [{
+        id: pageId,
+        title: `Buildin Post ${pageId.substring(0, 8)}`,
+        url: pageUrl,
+        shareUrl: pageUrl.includes('/share/') ? pageUrl : `https://buildin.ai/share/${pageId}`,
+        source: 'error-fallback'
+      }];
     }
     return [];
   }
 }
 
-// Fetch individual post metadata (title + cover image)
+// Enhanced post metadata fetcher
 async function fetchBuildinPostMeta(postUrl) {
   try {
+    console.log(`🔍 Fetching post metadata: ${postUrl}`);
+    
     const response = await axios.get(postUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
       timeout: 10000
     });
     
     let title = 'Buildin Post';
     let imageUrl = null;
+    let description = null;
     
     if (cheerio) {
       const $ = cheerio.load(response.data);
       
-      // Extract title
-      title = $('title').text().trim() || 
-              $('h1').first().text().trim() || 
-              $('h2').first().text().trim() ||
-              $('[class*="title"]').first().text().trim() ||
-              'Buildin Post';
+      // Extract title with priority order
+      const titleSources = [
+        $('meta[property="og:title"]').attr('content'),
+        $('meta[name="twitter:title"]').attr('content'),
+        $('title').text().trim(),
+        $('h1').first().text().trim(),
+        $('h2').first().text().trim(),
+        $('[class*="title"]').first().text().trim()
+      ].filter(Boolean);
       
-      // Clean title
-      if (title === 'Buildin.AI | Create, connect, publish instantly' || title.length < 3) {
-        title = `Buildin Post ${extractPageId(postUrl)?.substring(0, 6) || 'New'}`;
+      if (titleSources.length > 0) {
+        title = titleSources[0];
+        // Clean up common patterns
+        title = title.replace(/^Buildin\.AI.*?\|\s*/, '')
+                    .replace(/\s*\|\s*Buildin\.AI.*$/, '')
+                    .trim();
       }
       
-      // Extract first meaningful image
-      $('img').each((i, el) => {
-        const src = $(el).attr('src');
-        if (src && !imageUrl && !src.includes('logo') && !src.includes('icon') && 
-            (src.startsWith('http') || src.startsWith('data:'))) {
-          imageUrl = src;
-          return false; // Break
-        }
-      });
-      
-      // Try meta tags
-      if (!imageUrl) {
-        imageUrl = $('meta[property="og:image"]').attr('content') || 
-                   $('meta[name="twitter:image"]').attr('content');
+      if (!title || title.length < 3 || title === 'Buildin.AI | Create, connect, publish instantly') {
+        title = `Buildin Post ${extractPageId(postUrl)?.substring(0, 8) || 'New'}`;
       }
+      
+      // Extract description
+      const descriptionSources = [
+        $('meta[property="og:description"]').attr('content'),
+        $('meta[name="twitter:description"]').attr('content'),
+        $('meta[name="description"]').attr('content'),
+        $('p').first().text().trim()
+      ].filter(Boolean);
+      
+      if (descriptionSources.length > 0) {
+        description = descriptionSources[0].substring(0, 300);
+      }
+      
+      // Extract image with priority order
+      const imageSources = [
+        $('meta[property="og:image"]').attr('content'),
+        $('meta[name="twitter:image"]').attr('content'),
+        $('meta[name="twitter:image:src"]').attr('content')
+      ].filter(Boolean);
+      
+      if (imageSources.length > 0) {
+        imageUrl = imageSources[0];
+      } else {
+        // Look for first meaningful image
+        $('img').each((i, el) => {
+          const src = $(el).attr('src');
+          if (src && !imageUrl && 
+              !src.includes('logo') && 
+              !src.includes('icon') && 
+              !src.includes('avatar') &&
+              (src.startsWith('http') || src.startsWith('data:') || src.startsWith('/'))) {
+            imageUrl = src.startsWith('/') ? `https://buildin.ai${src}` : src;
+            return false; // Break
+          }
+        });
+      }
+      
+      console.log(`✅ Extracted metadata: title="${title}", image=${imageUrl ? 'yes' : 'no'}, desc=${description ? 'yes' : 'no'}`);
     }
     
     return {
       title: title.substring(0, 100),
+      description: description ? description.substring(0, 300) : null,
       imageUrl: imageUrl || null,
       url: postUrl
     };
     
   } catch (error) {
-    console.error(`Error fetching post meta ${postUrl}:`, error.message);
+    console.error(`❌ Error fetching post meta ${postUrl}:`, error.message);
+    const pageId = extractPageId(postUrl);
     return {
-      title: `Buildin Post ${extractPageId(postUrl)?.substring(0, 6) || 'New'}`,
+      title: `Buildin Post ${pageId?.substring(0, 8) || 'New'}`,
+      description: null,
       imageUrl: null,
       url: postUrl
     };
   }
 }
 
-// Create Discord embed from post metadata
+// Create enhanced Discord embed
 function buildEmbedFromBuildinPost(meta) {
   const embed = new EmbedBuilder()
     .setTitle(meta.title || 'Buildin Post')
     .setURL(meta.url)
     .setColor('#00D4AA')
     .setTimestamp(new Date())
-    .setFooter({ text: 'Buildin.ai' });
+    .setFooter({ text: 'Buildin.ai', iconURL: 'https://buildin.ai/favicon.ico' });
+  
+  if (meta.description) {
+    embed.setDescription(meta.description);
+  }
   
   if (meta.imageUrl) {
     embed.setImage(meta.imageUrl);
@@ -431,21 +563,28 @@ async function checkBuildinFeeds() {
           continue;
         }
         
+        console.log(`🔄 Processing feed: ${feed.title || feed.pageId} (guild: ${guild.name})`);
+        
         // Handle initial backfill
         if (!feed.backfilled && feed.initialBackfill > 0) {
-          console.log(`🚀 Starting backfill for ${feed.title || feed.pageId} (${feed.initialBackfill} posts)`);
+          console.log(`🚀 Starting backfill for "${feed.title || feed.pageId}" (${feed.initialBackfill} posts)`);
           
           const posts = await fetchBuildinGalleryPosts(feed.pageUrl, feed.galleryFragment);
           const postsToPublish = posts.slice(0, feed.initialBackfill).reverse(); // Oldest first
           
-          for (const post of postsToPublish) {
-            if (feed.lastPostedIds && feed.lastPostedIds.includes(post.id)) continue;
+          console.log(`📝 Publishing ${postsToPublish.length} backfill posts...`);
+          
+          for (const [index, post] of postsToPublish.entries()) {
+            if (feed.lastPostedIds && feed.lastPostedIds.includes(post.id)) {
+              console.log(`⏭️ Skipping already posted: "${post.title}"`);
+              continue;
+            }
             
             const postMeta = await fetchBuildinPostMeta(post.shareUrl || post.url);
             const embed = buildEmbedFromBuildinPost(postMeta);
             
             await channel.send({ embeds: [embed] });
-            console.log(`🚀 Backfill posted: "${postMeta.title}" to ${guild.name}#${channel.name}`);
+            console.log(`📤 Backfill ${index + 1}/${postsToPublish.length}: "${postMeta.title}" → ${guild.name}#${channel.name}`);
             
             // Add to posted IDs
             feed.lastPostedIds = feed.lastPostedIds || [];
@@ -458,20 +597,23 @@ async function checkBuildinFeeds() {
           feed.backfilled = true;
           feed.lastCheck = now;
           guildChanged = true;
+          console.log(`✅ Backfill completed for "${feed.title || feed.pageId}"`);
           
         } else if (shouldCheck) {
           // Regular check for new posts
-          console.log(`🔍 Checking for new posts: ${feed.title || feed.pageId}`);
+          console.log(`🔍 Regular check for new posts: "${feed.title || feed.pageId}"`);
           
           const posts = await fetchBuildinGalleryPosts(feed.pageUrl, feed.galleryFragment);
           const newPosts = posts.filter(post => !(feed.lastPostedIds || []).includes(post.id));
           
-          for (const post of newPosts.slice(0, 3)) { // Limit to 3 new posts per check
+          console.log(`📊 Found ${newPosts.length} new posts (total: ${posts.length})`);
+          
+          for (const [index, post] of newPosts.slice(0, 3).entries()) { // Limit to 3 new posts per check
             const postMeta = await fetchBuildinPostMeta(post.shareUrl || post.url);
             const embed = buildEmbedFromBuildinPost(postMeta);
             
             await channel.send({ embeds: [embed] });
-            console.log(`🚀 Posted new Buildin post: "${postMeta.title}" to ${guild.name}#${channel.name}`);
+            console.log(`📤 New post ${index + 1}: "${postMeta.title}" → ${guild.name}#${channel.name}`);
             
             // Add to posted IDs (keep last 200)
             feed.lastPostedIds = feed.lastPostedIds || [];
@@ -489,13 +631,14 @@ async function checkBuildinFeeds() {
         }
         
       } catch (error) {
-        console.error(`Buildin feed error (guild ${guildDoc.guildId}, feed ${feed.title}):`, error.message);
+        console.error(`❌ Buildin feed error (guild ${guildDoc.guildId}, feed "${feed.title || feed.pageId}"):`, error.message);
       }
     }
 
     if (guildChanged) {
       try {
         await guildDoc.save();
+        console.log(`💾 Saved changes for guild ${guild.name}`);
       } catch (error) {
         console.error('Failed to save guild after Buildin updates:', error.message);
       }
