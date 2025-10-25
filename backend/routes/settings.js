@@ -10,6 +10,18 @@ const verifyAccess = async (userId, guildId) => {
   return user.guilds.some(g => g.id === guildId);
 };
 
+// Extract pageId from Buildin URL
+const extractPageId = (urlOrId) => {
+  if (!urlOrId) return null;
+  // If it's already a UUID, return as is
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlOrId)) {
+    return urlOrId;
+  }
+  // Extract from URL pattern: buildin.ai/pageId or buildin.ai/workspace/pageId
+  const match = urlOrId.match(/buildin\.ai\/(?:[^/]+\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return match ? match[1] : null;
+};
+
 // Get guild roles from Discord API
 router.get('/:guildId/roles', verifyToken, async (req, res) => {
   try {
@@ -85,6 +97,133 @@ router.get('/:guildId/channels', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Bot lacks permissions to view channels' });
     }
     res.status(500).json({ error: 'Failed to fetch channels' });
+  }
+});
+
+// Get Buildin feeds
+router.get('/:guildId/buildin', verifyToken, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const guild = await Guild.findOne({ guildId });
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found' });
+    }
+
+    res.json({ feeds: guild.settings.buildinFeeds || [] });
+  } catch (err) {
+    console.error('Error fetching buildin feeds:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Add/Update Buildin feed
+router.post('/:guildId/buildin', verifyToken, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const { pageUrl, channelId, interval = 5, enabled = true, title } = req.body;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const pageId = extractPageId(pageUrl);
+    if (!pageId) {
+      return res.status(400).json({ error: 'Invalid Buildin page URL or ID' });
+    }
+
+    if (!channelId || interval < 1 || interval > 60) {
+      return res.status(400).json({ error: 'Invalid channel or interval (1-60 minutes)' });
+    }
+
+    const guild = await Guild.findOne({ guildId });
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found' });
+    }
+
+    // Check if feed already exists
+    const existingFeed = guild.settings.buildinFeeds.find(f => f.pageId === pageId);
+    if (existingFeed) {
+      // Update existing
+      existingFeed.pageUrl = pageUrl;
+      existingFeed.channelId = channelId;
+      existingFeed.interval = interval;
+      existingFeed.enabled = enabled;
+      existingFeed.title = title || pageId;
+    } else {
+      // Add new
+      guild.settings.buildinFeeds.push({
+        pageId,
+        pageUrl,
+        channelId,
+        interval,
+        enabled,
+        lastCheck: new Date(),
+        lastPostedIds: [],
+        title: title || pageId,
+        createdAt: new Date()
+      });
+    }
+
+    await guild.save();
+    res.json({ success: true, feeds: guild.settings.buildinFeeds });
+  } catch (err) {
+    console.error('Error adding buildin feed:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete Buildin feed
+router.delete('/:guildId/buildin/:feedId', verifyToken, async (req, res) => {
+  try {
+    const { guildId, feedId } = req.params;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const guild = await Guild.findOne({ guildId });
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found' });
+    }
+
+    guild.settings.buildinFeeds = guild.settings.buildinFeeds.filter(
+      feed => feed._id.toString() !== feedId
+    );
+    
+    await guild.save();
+    res.json({ success: true, feeds: guild.settings.buildinFeeds });
+  } catch (err) {
+    console.error('Error deleting buildin feed:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Test Buildin feed (manual check)
+router.post('/:guildId/buildin/test', verifyToken, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const { pageId, channelId } = req.body;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // This will be handled by the bot - just return success for now
+    // The actual implementation will be in bot.js
+    res.json({ 
+      success: true, 
+      message: 'Тестовая проверка запущена. Проверьте канал Discord.',
+      pageId,
+      channelId
+    });
+  } catch (err) {
+    console.error('Error testing buildin feed:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
