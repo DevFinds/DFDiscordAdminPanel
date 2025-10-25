@@ -41,4 +41,11 @@ export const settings = {
   deleteRSSFeed: (guildId, feedId) => api.delete(`/api/settings/${guildId}/rss/${feedId}`)
 };
 
+export const buildin = {
+  getFeeds: (guildId) => api.get(`/api/settings/${guildId}/buildin`),
+  addFeed: (guildId, data) => api.post(`/api/settings/${guildId}/buildin`, data),
+  deleteFeed: (guildId, feedId) => api.delete(`/api/settings/${guildId}/buildin/${feedId}`),
+  testFeed: (guildId, data) => api.post(`/api/settings/${guildId}/buildin/test`, data)
+};
+
 export default api;
