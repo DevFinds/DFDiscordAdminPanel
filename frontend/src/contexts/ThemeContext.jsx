@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme, THEMES } from '../hooks/useTheme';
 
 const ThemeContext = createContext(undefined);
 
@@ -20,3 +20,6 @@ export const useThemeContext = () => {
   }
   return context;
 };
+
+// Export THEMES for convenience
+export { THEMES };
