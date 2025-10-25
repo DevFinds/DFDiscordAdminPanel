@@ -1,75 +1,227 @@
-import React, { useState } from 'react';
-import { settings } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { settings, guild } from '../../services/api';
+import { FaHeart, FaSpinner } from 'react-icons/fa';
 
 function WelcomeSettings({ guildId, settings: guildSettings, onUpdate }) {
-  const [enabled, setEnabled] = useState(guildSettings.welcomeEnabled || false);
-  const [channel, setChannel] = useState(guildSettings.welcomeChannel || '');
-  const [message, setMessage] = useState(guildSettings.welcomeMessage || 'Welcome, {{user}}!');
+  const [welcomeEnabled, setWelcomeEnabled] = useState(guildSettings.welcomeEnabled || false);
+  const [welcomeChannel, setWelcomeChannel] = useState(guildSettings.welcomeChannel || '');
+  const [welcomeMessage, setWelcomeMessage] = useState(
+    guildSettings.welcomeMessage || 'Welcome to {{server}}, {{user}}! 👋 You are member #{{memberCount}}'
+  );
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [channels, setChannels] = useState([]);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (welcomeEnabled && channels.length === 0) {
+      loadChannels();
+    }
+  }, [welcomeEnabled, guildId]);
+
+  const loadChannels = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await guild.getChannels(guildId);
+      setChannels(response.data.channels || []);
+    } catch (err) {
+      console.error('Error loading channels:', err);
+      setError(err.response?.data?.error || 'Ошибка загрузки каналов');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await settings.updateWelcome(guildId, {
-        welcomeEnabled: enabled,
-        welcomeChannel: channel,
-        welcomeMessage: message
+        welcomeEnabled,
+        welcomeChannel,
+        welcomeMessage
       });
-      alert('Welcome settings saved!');
+      alert('✅ Настройки приветствий сохранены!');
       onUpdate();
     } catch (err) {
-      alert('Saving error: ' + err.message);
+      alert('❌ Ошибка: ' + (err.response?.data?.error || err.message));
     } finally {
       setSaving(false);
     }
   };
 
+  const getChannelById = (channelId) => channels.find(c => c.id === channelId);
+  const selectedChannel = getChannelById(welcomeChannel);
+
   return (
     <div className="settings-panel">
-      <h2>Welcome Message Settings</h2>
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <FaHeart style={{ color: '#f04747' }} /> Приветственные сообщения
+      </h2>
+      <p style={{ color: '#b9bbbe', marginBottom: '1.5rem' }}>
+        Автоматически приветствуйте новых участников сервера персонализированными сообщениями
+      </p>
+
       <div className="form-group">
-        <label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
           <input 
             type="checkbox" 
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
+            checked={welcomeEnabled}
+            onChange={(e) => setWelcomeEnabled(e.target.checked)}
           />
-          Enable welcome messages
+          Включить приветственные сообщения
         </label>
       </div>
-      {enabled && (
-        <>
+
+      {welcomeEnabled && (
+        <div style={{ marginTop: '1.5rem' }}>
+          {/* Channel Selection */}
           <div className="form-group">
-            <label>Channel ID for welcome:</label>
-            <input 
-              type="text" 
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              placeholder="123456789012345678"
-            />
-            <small>Right click channel in Discord → Copy ID</small>
+            <label>Канал для приветствий:</label>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem' }}>
+                <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Загрузка каналов...</span>
+              </div>
+            ) : error ? (
+              <div style={{ color: '#f04747', padding: '0.75rem' }}>
+                {error}
+                <button 
+                  onClick={loadChannels}
+                  style={{
+                    marginLeft: '0.5rem',
+                    background: '#5865F2',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  🔄 Повторить
+                </button>
+              </div>
+            ) : (
+              <select 
+                value={welcomeChannel} 
+                onChange={(e) => setWelcomeChannel(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#40444b',
+                  border: '1px solid #72767d',
+                  borderRadius: '4px',
+                  color: '#ffffff'
+                }}
+              >
+                <option value="">Выберите канал для приветствий</option>
+                {channels.filter(c => [0, 5].includes(c.type)).map(channel => (
+                  <option key={channel.id} value={channel.id}>
+                    #{channel.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {selectedChannel && (
+              <small style={{ color: '#43b581', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
+                ✅ Выбран канал: <strong>#{selectedChannel.name}</strong>
+              </small>
+            )}
           </div>
+
+          {/* Welcome Message */}
           <div className="form-group">
-            <label>Welcome message text:</label>
+            <label>Текст приветствия:</label>
             <textarea 
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              placeholder="Use {{user}}, {{username}}, {{server}}"
+              value={welcomeMessage} 
+              onChange={(e) => setWelcomeMessage(e.target.value)}
+              rows="4"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#40444b',
+                border: '1px solid #72767d',
+                borderRadius: '4px',
+                color: '#ffffff',
+                resize: 'vertical'
+              }}
             />
-            <small>
-              Available variables: {'{{user}}'}, {'{{username}}'}, {'{{server}}'}, {'{{memberCount}}'}
-            </small>
+            <div style={{ marginTop: '0.5rem' }}>
+              <small style={{ color: '#b9bbbe' }}>Доступные переменные:</small>
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '0.5rem', 
+                marginTop: '0.5rem'
+              }}>
+                {[
+                  { var: '{{user}}', desc: 'упоминание пользователя' },
+                  { var: '{{username}}', desc: 'имя пользователя' },
+                  { var: '{{server}}', desc: 'название сервера' },
+                  { var: '{{memberCount}}', desc: 'количество участников' }
+                ].map(({ var: variable, desc }) => (
+                  <span 
+                    key={variable}
+                    style={{
+                      background: '#2c2f33',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      border: '1px solid #40444b',
+                      cursor: 'pointer'
+                    }}
+                    title={desc}
+                    onClick={() => {
+                      setWelcomeMessage(prev => prev + ' ' + variable);
+                    }}
+                  >
+                    {variable}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-        </>
+
+          {/* Preview */}
+          {welcomeMessage && (
+            <div className="form-group">
+              <label>Предварительный просмотр:</label>
+              <div style={{
+                background: '#2c2f33',
+                border: '1px solid #40444b',
+                borderRadius: '6px',
+                padding: '1rem',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                lineHeight: '1.4'
+              }}>
+                {welcomeMessage
+                  .replace(/\{\{user\}\}/g, '@НовыйПользователь')
+                  .replace(/\{\{username\}\}/g, 'НовыйПользователь')
+                  .replace(/\{\{server\}\}/g, 'Мой Сервер')
+                  .replace(/\{\{memberCount\}\}/g, '42')
+                }
+              </div>
+            </div>
+          )}
+        </div>
       )}
+
       <button 
-        className="btn-save"
-        onClick={handleSave}
-        disabled={saving}
+        className="btn-save" 
+        onClick={handleSave} 
+        disabled={saving || (welcomeEnabled && !welcomeChannel)}
+        style={{ marginTop: '1.5rem' }}
       >
-        {saving ? 'Saving...' : 'Save'}
+        {saving ? '💾 Сохранение...' : '💾 Сохранить настройки'}
       </button>
+      
+      {welcomeEnabled && !welcomeChannel && (
+        <p style={{ color: '#faa61a', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+          ⚠️ Выберите канал для отправки приветствий
+        </p>
+      )}
     </div>
   );
 }
