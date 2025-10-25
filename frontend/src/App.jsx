@@ -5,8 +5,8 @@ import AuthCallback from './pages/AuthCallback';
 import Dashboard from './components/Dashboard';
 import ServerSettings from './pages/ServerSettings';
 import Navbar from './components/Navbar';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { auth } from './services/api';
-import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -20,25 +20,16 @@ function App() {
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
     
-    console.log('App: checking auth, token exists:', !!token);
-    
     if (!token) {
-      console.log('App: no token found, user not authenticated');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('App: fetching user data with token');
       const response = await auth.getMe();
-      console.log('App: user data received:', response.data);
       setUser(response.data);
       setAuthError(null);
     } catch (err) {
-      console.error('App: auth check failed:', err);
-      console.error('App: error response:', err.response?.data);
-      
-      // Clear invalid token
       localStorage.removeItem('token');
       setUser(null);
       setAuthError(err.response?.data?.error || 'Ошибка авторизации');
@@ -48,35 +39,32 @@ function App() {
   };
 
   const handleLogout = async () => {
-    console.log('App: logging out user');
     try {
       await auth.logout();
     } catch (err) {
-      console.error('App: logout error:', err);
+      console.error('Logout error:', err);
     } finally {
       localStorage.removeItem('token');
       setUser(null);
       setAuthError(null);
-      console.log('App: user logged out, token cleared');
     }
   };
 
   const handleUserUpdate = (newUser) => {
-    console.log('App: user updated:', newUser);
     setUser(newUser);
     setAuthError(null);
   };
 
   if (loading) {
     return (
-      <div className="login-container">
-        <div className="login-card">
-          <div className="loading">
-            <div className="loading-spinner animate-spin">🔄</div>
-            <h2>Загрузка приложения...</h2>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>
-              Проверяем авторизацию
-            </p>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center transition-colors duration-200">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-xl max-w-md w-full mx-4 border border-slate-200 dark:border-slate-700">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-pulse">
+              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Загрузка приложения...</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Проверяем авторизацию</p>
           </div>
         </div>
       </div>
@@ -84,54 +72,62 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="App">
-        {user && <Navbar user={user} onLogout={handleLogout} />}
-        
-        {/* Error display */}
-        {authError && !user && (
-          <div className="alert alert-error" style={{ margin: 'var(--space-4)' }}>
-            <span>⚠️</span>
-            <div>
-              <strong>Ошибка авторизации:</strong> {authError}
+    <ThemeProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+          {user && <Navbar user={user} onLogout={handleLogout} />}
+          
+          {/* Error display */}
+          {authError && !user && (
+            <div className="mx-4 mt-4">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 max-w-md mx-auto">
+                <div className="flex-shrink-0 w-6 h-6 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-red-800 dark:text-red-200 text-sm">Ошибка авторизации</h3>
+                  <p className="text-red-700 dark:text-red-300 text-sm mt-1">{authError}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-        
-        <Routes>
-          <Route 
-            path="/login" 
-            element={!user ? <Login /> : <Navigate to="/dashboard" replace />} 
-          />
+          )}
           
-          <Route 
-            path="/auth/callback" 
-            element={<AuthCallback setUser={handleUserUpdate} />} 
-          />
-          
-          <Route 
-            path="/dashboard" 
-            element={user ? <Dashboard user={user} /> : <Navigate to="/login" replace />} 
-          />
-          
-          <Route 
-            path="/server/:guildId" 
-            element={user ? <ServerSettings /> : <Navigate to="/login" replace />} 
-          />
-          
-          <Route 
-            path="/" 
-            element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
-          />
-          
-          {/* Catch all route */}
-          <Route 
-            path="*" 
-            element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
-          />
-        </Routes>
-      </div>
-    </BrowserRouter>
+          <Routes>
+            <Route 
+              path="/login" 
+              element={!user ? <Login /> : <Navigate to="/dashboard" replace />} 
+            />
+            
+            <Route 
+              path="/auth/callback" 
+              element={<AuthCallback setUser={handleUserUpdate} />} 
+            />
+            
+            <Route 
+              path="/dashboard" 
+              element={user ? <Dashboard user={user} /> : <Navigate to="/login" replace />} 
+            />
+            
+            <Route 
+              path="/server/:guildId" 
+              element={user ? <ServerSettings /> : <Navigate to="/login" replace />} 
+            />
+            
+            <Route 
+              path="/" 
+              element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
+            />
+            
+            <Route 
+              path="*" 
+              element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
+            />
+          </Routes>
+        </div>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 
