@@ -25,42 +25,82 @@ client.once('ready', async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Serving ${client.guilds.cache.size} servers`);
 
+  // Обновляем информацию о всех серверах при запуске бота
   for (const [guildId, guild] of client.guilds.cache) {
-    let exists = await Guild.findOne({ guildId });
-    if (!exists) {
-      await Guild.create({
-        guildId,
-        name: guild.name,
-        icon: guild.icon,
-        ownerId: guild.ownerId || (await guild.fetchOwner()).id,
-        settings: {}
-      });
-      console.log(`🗃 Guild "${guild.name}" [${guildId}] добавлен в MongoDB`);
+    try {
+      let guildDoc = await Guild.findOne({ guildId });
+      if (!guildDoc) {
+        // Создаем новую запись, если её нет
+        guildDoc = await Guild.create({
+          guildId,
+          name: guild.name,
+          icon: guild.icon,
+          ownerId: guild.ownerId,
+          settings: {}
+        });
+        console.log(`🗃 Guild "${guild.name}" [${guildId}] добавлен в MongoDB`);
+      } else {
+        // Обновляем существующую запись
+        guildDoc.name = guild.name;
+        guildDoc.icon = guild.icon;
+        guildDoc.ownerId = guild.ownerId;
+        guildDoc.updatedAt = new Date();
+        await guildDoc.save();
+        console.log(`🔄 Guild "${guild.name}" [${guildId}] обновлен в MongoDB`);
+      }
+    } catch (error) {
+      console.error(`Error updating guild ${guild.name}:`, error);
     }
   }
+
+  // Запускаем проверку RSS фидов каждые 5 минут
+  cron.schedule('*/5 * * * *', () => {
+    checkRSSFeeds();
+  });
 });
 
 client.on('guildCreate', async (guild) => {
-  let exists = await Guild.findOne({ guildId: guild.id });
-  if (!exists) {
-    await Guild.create({
-      guildId: guild.id,
-      name: guild.name,
-      icon: guild.icon,
-      ownerId: guild.ownerId || (await guild.fetchOwner()).id,
-      settings: {}
-    });
-    console.log(`🗃 Guild "${guild.name}" [${guild.id}] добавлен в MongoDB (guildCreate)`);
+  try {
+    let guildDoc = await Guild.findOne({ guildId: guild.id });
+    if (!guildDoc) {
+      guildDoc = await Guild.create({
+        guildId: guild.id,
+        name: guild.name,
+        icon: guild.icon,
+        ownerId: guild.ownerId,
+        settings: {}
+      });
+      console.log(`🗃 Guild "${guild.name}" [${guild.id}] добавлен в MongoDB (guildCreate)`);
+    } else {
+      // Обновляем информацию, если запись уже существует
+      guildDoc.name = guild.name;
+      guildDoc.icon = guild.icon;
+      guildDoc.ownerId = guild.ownerId;
+      guildDoc.updatedAt = new Date();
+      await guildDoc.save();
+      console.log(`🔄 Guild "${guild.name}" [${guild.id}] обновлен в MongoDB (guildCreate)`);
+    }
+  } catch (error) {
+    console.error(`Error in guildCreate for ${guild.name}:`, error);
   }
 });
 
-
-
+// Удаляем сервер из базы данных при удалении бота
+client.on('guildDelete', async (guild) => {
+  try {
+    await Guild.findOneAndDelete({ guildId: guild.id });
+    console.log(`🗑 Guild "${guild.name}" [${guild.id}] удален из MongoDB (guildDelete)`);
+  } catch (error) {
+    console.error(`Error in guildDelete for ${guild.name}:`, error);
+  }
+});
 
 client.on('guildMemberAdd', async (member) => {
   try {
     const guildSettings = await Guild.findOne({ guildId: member.guild.id });
     if (!guildSettings) return;
+
+    // Приветственные сообщения
     if (guildSettings.settings.welcomeEnabled && guildSettings.settings.welcomeChannel) {
       const channel = member.guild.channels.cache.get(guildSettings.settings.welcomeChannel);
       if (channel) {
@@ -73,6 +113,8 @@ client.on('guildMemberAdd', async (member) => {
         console.log(`👋 Sent welcome message for ${member.user.tag} in ${member.guild.name}`);
       }
     }
+
+    // Автоматическое назначение ролей
     if (guildSettings.settings.autoRoleEnabled && guildSettings.settings.autoRoleIds.length > 0) {
       for (const roleId of guildSettings.settings.autoRoleIds) {
         const role = member.guild.roles.cache.get(roleId);
@@ -197,6 +239,7 @@ process.on('SIGINT', async () => {
   await mongoose.connection.close();
   process.exit(0);
 });
+
 client.login(process.env.DISCORD_BOT_TOKEN)
   .catch(err => {
     console.error('❌ Failed to login bot:', err);
