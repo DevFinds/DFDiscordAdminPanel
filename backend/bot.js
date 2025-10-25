@@ -5,7 +5,14 @@ const Guild = require('./models/Guild');
 const Parser = require('rss-parser');
 const cron = require('node-cron');
 const axios = require('axios');
-const cheerio = require('cheerio');
+
+let cheerio;
+try {
+  cheerio = require('cheerio');
+} catch (err) {
+  console.warn('Cheerio not available, using fallback parsing');
+  cheerio = null;
+}
 
 const client = new Client({
   intents: [
@@ -233,60 +240,91 @@ function extractGalleryFragment(pageUrl) {
   return match ? match[1] : null;
 }
 
+// Fallback: create simple post from page URL
+function createFallbackPost(pageUrl, pageId) {
+  return {
+    id: pageId,
+    title: `Buildin Post ${pageId.substring(0, 6)}`,
+    url: pageUrl,
+    shareUrl: pageUrl.includes('/share/') ? pageUrl : `https://buildin.ai/share/${pageId}`
+  };
+}
+
 // Fetch Buildin gallery page and extract posts
 async function fetchBuildinGalleryPosts(pageUrl, galleryFragment) {
   try {
-    const shareUrl = `https://buildin.ai/share/${extractPageId(pageUrl)}`;
+    const pageId = extractPageId(pageUrl);
+    if (!pageId) return [];
+    
+    const shareUrl = `https://buildin.ai/share/${pageId}`;
+    console.log(`🚀 Fetching Buildin gallery: ${shareUrl}`);
+    
     const response = await axios.get(shareUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       },
-      timeout: 10000
+      timeout: 15000
     });
     
-    const $ = cheerio.load(response.data);
     const posts = [];
     
-    // Look for gallery items or post cards in the HTML
-    // This is a simplified parser - adjust selectors based on actual Buildin HTML structure
-    $('a[href*="buildin.ai"]').each((i, el) => {
-      const link = $(el).attr('href');
-      const title = $(el).text().trim() || $(el).find('h1, h2, h3, h4, .title, [class*="title"]').text().trim();
-      const postId = extractPageId(link);
+    if (cheerio) {
+      // Try HTML parsing with cheerio
+      const $ = cheerio.load(response.data);
       
-      if (postId && link.includes('/share/') && title && title.length > 5) {
-        posts.push({
-          id: postId,
-          title: title.substring(0, 100), // Limit title length
-          url: link,
-          shareUrl: link.includes('/share/') ? link : `https://buildin.ai/share/${postId}`
+      // Look for various patterns that might be posts
+      const selectors = [
+        'a[href*="buildin.ai"]',
+        '[href*="/share/"]',
+        '[class*="post"], [class*="card"], [class*="item"]',
+        'h1, h2, h3, h4'
+      ];
+      
+      for (const selector of selectors) {
+        $(selector).each((i, el) => {
+          const $el = $(el);
+          const link = $el.attr('href') || $el.find('a').attr('href');
+          const title = $el.text().trim() || $el.attr('title') || $el.find('[class*="title"]').text().trim();
+          
+          if (title && title.length > 5 && title.length < 200) {
+            const postId = link ? extractPageId(link) : `text-${Date.now()}-${i}`;
+            const postUrl = link && link.includes('buildin.ai') ? link : shareUrl;
+            
+            posts.push({
+              id: postId || `generated-${Date.now()}-${i}`,
+              title: title.substring(0, 100),
+              url: postUrl,
+              shareUrl: postUrl.includes('/share/') ? postUrl : `https://buildin.ai/share/${postId || pageId}`
+            });
+          }
         });
-      }
-    });
-    
-    // If no posts found in links, try to find them in text content
-    if (posts.length === 0) {
-      const textContent = $.text();
-      const titleMatches = textContent.match(/[\u0410-\u044f\w\s]{10,100}/g) || [];
-      
-      for (let i = 0; i < Math.min(titleMatches.length, 5); i++) {
-        const title = titleMatches[i].trim();
-        if (title && title.length > 10) {
-          posts.push({
-            id: `generated-${Date.now()}-${i}`,
-            title: title.substring(0, 80),
-            url: shareUrl,
-            shareUrl: shareUrl
-          });
-        }
+        
+        if (posts.length > 0) break; // Found posts with this selector
       }
     }
     
-    console.log(`🚀 Fetched ${posts.length} posts from Buildin gallery ${shareUrl}`);
-    return posts.slice(0, 20); // Limit to 20 posts max
+    // Fallback: create at least one post from the page itself
+    if (posts.length === 0) {
+      console.log(`🚀 Using fallback post creation for ${pageUrl}`);
+      posts.push(createFallbackPost(pageUrl, pageId));
+    }
+    
+    // Remove duplicates and limit
+    const uniquePosts = posts.filter((post, index, self) => 
+      index === self.findIndex(p => p.id === post.id || p.title === post.title)
+    ).slice(0, 10);
+    
+    console.log(`🚀 Extracted ${uniquePosts.length} posts from Buildin gallery`);
+    return uniquePosts;
     
   } catch (error) {
     console.error(`Error fetching Buildin gallery ${pageUrl}:`, error.message);
+    
+    // Always return fallback post so something gets published
+    const pageId = extractPageId(pageUrl);
+    if (pageId) {
+      return [createFallbackPost(pageUrl, pageId)];
+    }
     return [];
   }
 }
@@ -298,36 +336,42 @@ async function fetchBuildinPostMeta(postUrl) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       },
-      timeout: 8000
+      timeout: 10000
     });
     
-    const $ = cheerio.load(response.data);
-    
-    // Extract title
-    let title = $('title').text().trim() || 
-                $('h1').first().text().trim() || 
-                $('h2').first().text().trim() ||
-                $('[class*="title"]').first().text().trim();
-    
-    if (!title || title === 'Buildin.AI | Create, connect, publish instantly') {
-      title = 'Buildin Post';
-    }
-    
-    // Extract first image as cover
+    let title = 'Buildin Post';
     let imageUrl = null;
-    const images = $('img');
-    images.each((i, el) => {
-      const src = $(el).attr('src');
-      if (src && !imageUrl && !src.includes('logo') && !src.includes('icon') && src.includes('http')) {
-        imageUrl = src;
-        return false; // Break loop
-      }
-    });
     
-    // Try meta tags for image
-    if (!imageUrl) {
-      imageUrl = $('meta[property="og:image"]').attr('content') || 
-                 $('meta[name="twitter:image"]').attr('content');
+    if (cheerio) {
+      const $ = cheerio.load(response.data);
+      
+      // Extract title
+      title = $('title').text().trim() || 
+              $('h1').first().text().trim() || 
+              $('h2').first().text().trim() ||
+              $('[class*="title"]').first().text().trim() ||
+              'Buildin Post';
+      
+      // Clean title
+      if (title === 'Buildin.AI | Create, connect, publish instantly' || title.length < 3) {
+        title = `Buildin Post ${extractPageId(postUrl)?.substring(0, 6) || 'New'}`;
+      }
+      
+      // Extract first meaningful image
+      $('img').each((i, el) => {
+        const src = $(el).attr('src');
+        if (src && !imageUrl && !src.includes('logo') && !src.includes('icon') && 
+            (src.startsWith('http') || src.startsWith('data:'))) {
+          imageUrl = src;
+          return false; // Break
+        }
+      });
+      
+      // Try meta tags
+      if (!imageUrl) {
+        imageUrl = $('meta[property="og:image"]').attr('content') || 
+                   $('meta[name="twitter:image"]').attr('content');
+      }
     }
     
     return {
@@ -339,7 +383,7 @@ async function fetchBuildinPostMeta(postUrl) {
   } catch (error) {
     console.error(`Error fetching post meta ${postUrl}:`, error.message);
     return {
-      title: 'Buildin Post',
+      title: `Buildin Post ${extractPageId(postUrl)?.substring(0, 6) || 'New'}`,
       imageUrl: null,
       url: postUrl
     };
@@ -382,7 +426,10 @@ async function checkBuildinFeeds() {
         const shouldCheck = now - lastCheck >= intervalMs;
         
         const channel = guild.channels.cache.get(feed.channelId);
-        if (!channel) continue;
+        if (!channel) {
+          console.log(`⚠️ Channel ${feed.channelId} not found for guild ${guild.name}`);
+          continue;
+        }
         
         // Handle initial backfill
         if (!feed.backfilled && feed.initialBackfill > 0) {
@@ -398,14 +445,14 @@ async function checkBuildinFeeds() {
             const embed = buildEmbedFromBuildinPost(postMeta);
             
             await channel.send({ embeds: [embed] });
-            console.log(`🚀 Backfill posted: ${postMeta.title} to ${guild.name}#${channel.name}`);
+            console.log(`🚀 Backfill posted: "${postMeta.title}" to ${guild.name}#${channel.name}`);
             
             // Add to posted IDs
             feed.lastPostedIds = feed.lastPostedIds || [];
             feed.lastPostedIds.push(post.id);
             
             // Small delay between posts
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
           
           feed.backfilled = true;
@@ -414,6 +461,8 @@ async function checkBuildinFeeds() {
           
         } else if (shouldCheck) {
           // Regular check for new posts
+          console.log(`🔍 Checking for new posts: ${feed.title || feed.pageId}`);
+          
           const posts = await fetchBuildinGalleryPosts(feed.pageUrl, feed.galleryFragment);
           const newPosts = posts.filter(post => !(feed.lastPostedIds || []).includes(post.id));
           
@@ -422,7 +471,7 @@ async function checkBuildinFeeds() {
             const embed = buildEmbedFromBuildinPost(postMeta);
             
             await channel.send({ embeds: [embed] });
-            console.log(`🚀 Posted new Buildin post: ${postMeta.title} to ${guild.name}#${channel.name}`);
+            console.log(`🚀 Posted new Buildin post: "${postMeta.title}" to ${guild.name}#${channel.name}`);
             
             // Add to posted IDs (keep last 200)
             feed.lastPostedIds = feed.lastPostedIds || [];
@@ -432,7 +481,7 @@ async function checkBuildinFeeds() {
             }
             
             // Small delay between posts
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
           
           feed.lastCheck = now;
