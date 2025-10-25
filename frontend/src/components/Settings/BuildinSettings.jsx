@@ -15,7 +15,8 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
     channelId: '',
     interval: 5,
     enabled: true,
-    title: ''
+    title: '',
+    initialBackfill: 3
   });
 
   useEffect(() => {
@@ -67,6 +68,11 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
       return;
     }
 
+    if (newFeed.initialBackfill < 0 || newFeed.initialBackfill > 20) {
+      alert('⚠️ Количество предыдущих постов должно быть от 0 до 20');
+      return;
+    }
+
     setSaving(true);
     try {
       await buildin.addFeed(guildId, {
@@ -74,11 +80,12 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
         channelId: newFeed.channelId,
         interval: parseInt(newFeed.interval),
         enabled: newFeed.enabled,
-        title: newFeed.title || `Buildin страница`
+        title: newFeed.title || `Buildin страница`,
+        initialBackfill: parseInt(newFeed.initialBackfill)
       });
       
       alert('✅ Buildin интеграция добавлена!');
-      setNewFeed({ pageUrl: '', channelId: '', interval: 5, enabled: true, title: '' });
+      setNewFeed({ pageUrl: '', channelId: '', interval: 5, enabled: true, title: '', initialBackfill: 3 });
       setShowAddForm(false);
       await loadData();
       onUpdate();
@@ -199,7 +206,7 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
             marginBottom: '1rem'
           }}>
             <div>
-              <label>Ссылка на страницу Buildin.ai:</label>
+              <label>Ссылка на страницу/галерею Buildin.ai:</label>
               <input
                 type="text"
                 placeholder="https://buildin.ai/..."
@@ -279,6 +286,32 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
                   color: '#ffffff'
                 }}
               />
+            </div>
+            
+            <div>
+              <label>Опубликовать сразу (количество предыдущих постов):</label>
+              <select
+                value={newFeed.initialBackfill}
+                onChange={(e) => setNewFeed({...newFeed, initialBackfill: parseInt(e.target.value)})}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#40444b',
+                  border: '1px solid #72767d',
+                  borderRadius: '4px',
+                  color: '#ffffff'
+                }}
+              >
+                <option value={0}>Не публиковать предыдущие посты</option>
+                <option value={1}>1 пост</option>
+                <option value={3}>3 поста</option>
+                <option value={5}>5 постов</option>
+                <option value={10}>10 постов</option>
+                <option value={20}>20 постов</option>
+              </select>
+              <small style={{ color: '#b9bbbe', display: 'block', marginTop: '0.25rem' }}>
+                После создания бот опубликует эти посты с галереи
+              </small>
             </div>
           </div>
           
@@ -365,6 +398,11 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
                         <p><strong>Канал:</strong> {channel ? `#${channel.name}` : `ID: ${feed.channelId} (канал не найден)`}</p>
                         <p><strong>Интервал:</strong> {feed.interval} мин. | <strong>Последняя проверка:</strong> {formatLastCheck(feed.lastCheck)}</p>
                         <p><strong>Опубликовано:</strong> {feed.lastPostedIds?.length || 0} записей</p>
+                        <p><strong>Первичная публикация:</strong> 
+                          <span style={{ color: feed.backfilled ? '#43b581' : '#faa61a', marginLeft: '0.25rem' }}>
+                            {feed.backfilled ? 'выполнена' : 'ожидание'} ({feed.initialBackfill || 0} постов)
+                          </span>
+                        </p>
                       </div>
                     </div>
                     
@@ -423,11 +461,11 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
       }}>
         <h4 style={{ color: '#5865F2', marginBottom: '0.5rem' }}>📚 Как настроить:</h4>
         <ol style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#b9bbbe' }}>
-          <li>Откройте страницу на Buildin.ai, которую хотите транслировать</li>
-          <li>Скопируйте URL страницы в поле выше</li>
+          <li>Откройте страницу/галерею на Buildin.ai, которую хотите транслировать</li>
+          <li>Скопируйте URL страницы (с #fragment для галерей) в поле выше</li>
           <li>Выберите Discord канал для публикации</li>
-          <li>Укажите интервал проверки (1-60 минут)</li>
-          <li>Нажмите "Добавить" и затем "Тест" для проверки</li>
+          <li>Укажите интервал проверки (1-60 минут) и количество предыдущих постов</li>
+          <li>Нажмите "Добавить" — бот опубликует посты с названиями и обложками</li>
         </ol>
       </div>
     </div>
