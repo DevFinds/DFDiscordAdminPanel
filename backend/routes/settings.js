@@ -22,6 +22,13 @@ const extractPageId = (urlOrId) => {
   return match ? match[1] : null;
 };
 
+// Extract gallery fragment from URL (after #)
+const extractGalleryFragment = (pageUrl) => {
+  if (!pageUrl) return null;
+  const match = pageUrl.match(/#([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return match ? match[1] : null;
+};
+
 // Get guild roles from Discord API
 router.get('/:guildId/roles', verifyToken, async (req, res) => {
   try {
@@ -125,7 +132,7 @@ router.get('/:guildId/buildin', verifyToken, async (req, res) => {
 router.post('/:guildId/buildin', verifyToken, async (req, res) => {
   try {
     const { guildId } = req.params;
-    const { pageUrl, channelId, interval = 5, enabled = true, title } = req.body;
+    const { pageUrl, channelId, interval = 5, enabled = true, title, initialBackfill = 3 } = req.body;
     
     if (!await verifyAccess(req.userId, guildId)) {
       return res.status(403).json({ error: 'Access denied' });
@@ -139,6 +146,12 @@ router.post('/:guildId/buildin', verifyToken, async (req, res) => {
     if (!channelId || interval < 1 || interval > 60) {
       return res.status(400).json({ error: 'Invalid channel or interval (1-60 minutes)' });
     }
+
+    if (initialBackfill < 0 || initialBackfill > 20) {
+      return res.status(400).json({ error: 'Initial backfill must be between 0-20 posts' });
+    }
+
+    const galleryFragment = extractGalleryFragment(pageUrl);
 
     const guild = await Guild.findOne({ guildId });
     if (!guild) {
@@ -154,6 +167,12 @@ router.post('/:guildId/buildin', verifyToken, async (req, res) => {
       existingFeed.interval = interval;
       existingFeed.enabled = enabled;
       existingFeed.title = title || pageId;
+      existingFeed.initialBackfill = initialBackfill;
+      existingFeed.galleryFragment = galleryFragment;
+      // Reset backfill if settings changed
+      if (existingFeed.initialBackfill !== initialBackfill) {
+        existingFeed.backfilled = false;
+      }
     } else {
       // Add new
       guild.settings.buildinFeeds.push({
@@ -165,6 +184,9 @@ router.post('/:guildId/buildin', verifyToken, async (req, res) => {
         lastCheck: new Date(),
         lastPostedIds: [],
         title: title || pageId,
+        initialBackfill,
+        backfilled: false,
+        galleryFragment,
         createdAt: new Date()
       });
     }
