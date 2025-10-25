@@ -5,6 +5,7 @@ const Guild = require('./models/Guild');
 const Parser = require('rss-parser');
 const cron = require('node-cron');
 const axios = require('axios');
+const cheerio = require('cheerio');
 
 const client = new Client({
   intents: [
@@ -218,7 +219,7 @@ async function checkRSSFeeds() {
   }
 }
 
-// Buildin fetch helpers
+// Buildin helpers
 function extractPageId(urlOrId) {
   if (!urlOrId) return null;
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlOrId)) return urlOrId;
@@ -226,78 +227,234 @@ function extractPageId(urlOrId) {
   return match ? match[1] : null;
 }
 
-async function fetchBuildinPageMeta(pageId) {
-  // Placeholder: if Buildin provides public API, call it here; else try to fetch public JSON if exists
-  // Example for future: const resp = await axios.get(`https://api.buildin.ai/v1/pages/${pageId}`, { headers: { Authorization: `Bearer ${process.env.BUILDIN_BOT_TOKEN}` }});
-  // Return minimal structure
-  return {
-    id: pageId,
-    title: `Buildin Page ${pageId.substring(0, 6)}`,
-    url: `https://buildin.ai/${pageId}`,
-    updatedAt: new Date().toISOString(),
-    blocks: []
-  };
+function extractGalleryFragment(pageUrl) {
+  if (!pageUrl) return null;
+  const match = pageUrl.match(/#([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return match ? match[1] : null;
 }
 
-function buildEmbedFromBuildin(meta) {
+// Fetch Buildin gallery page and extract posts
+async function fetchBuildinGalleryPosts(pageUrl, galleryFragment) {
+  try {
+    const shareUrl = `https://buildin.ai/share/${extractPageId(pageUrl)}`;
+    const response = await axios.get(shareUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 10000
+    });
+    
+    const $ = cheerio.load(response.data);
+    const posts = [];
+    
+    // Look for gallery items or post cards in the HTML
+    // This is a simplified parser - adjust selectors based on actual Buildin HTML structure
+    $('a[href*="buildin.ai"]').each((i, el) => {
+      const link = $(el).attr('href');
+      const title = $(el).text().trim() || $(el).find('h1, h2, h3, h4, .title, [class*="title"]').text().trim();
+      const postId = extractPageId(link);
+      
+      if (postId && link.includes('/share/') && title && title.length > 5) {
+        posts.push({
+          id: postId,
+          title: title.substring(0, 100), // Limit title length
+          url: link,
+          shareUrl: link.includes('/share/') ? link : `https://buildin.ai/share/${postId}`
+        });
+      }
+    });
+    
+    // If no posts found in links, try to find them in text content
+    if (posts.length === 0) {
+      const textContent = $.text();
+      const titleMatches = textContent.match(/[\u0410-\u044f\w\s]{10,100}/g) || [];
+      
+      for (let i = 0; i < Math.min(titleMatches.length, 5); i++) {
+        const title = titleMatches[i].trim();
+        if (title && title.length > 10) {
+          posts.push({
+            id: `generated-${Date.now()}-${i}`,
+            title: title.substring(0, 80),
+            url: shareUrl,
+            shareUrl: shareUrl
+          });
+        }
+      }
+    }
+    
+    console.log(`🚀 Fetched ${posts.length} posts from Buildin gallery ${shareUrl}`);
+    return posts.slice(0, 20); // Limit to 20 posts max
+    
+  } catch (error) {
+    console.error(`Error fetching Buildin gallery ${pageUrl}:`, error.message);
+    return [];
+  }
+}
+
+// Fetch individual post metadata (title + cover image)
+async function fetchBuildinPostMeta(postUrl) {
+  try {
+    const response = await axios.get(postUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 8000
+    });
+    
+    const $ = cheerio.load(response.data);
+    
+    // Extract title
+    let title = $('title').text().trim() || 
+                $('h1').first().text().trim() || 
+                $('h2').first().text().trim() ||
+                $('[class*="title"]').first().text().trim();
+    
+    if (!title || title === 'Buildin.AI | Create, connect, publish instantly') {
+      title = 'Buildin Post';
+    }
+    
+    // Extract first image as cover
+    let imageUrl = null;
+    const images = $('img');
+    images.each((i, el) => {
+      const src = $(el).attr('src');
+      if (src && !imageUrl && !src.includes('logo') && !src.includes('icon') && src.includes('http')) {
+        imageUrl = src;
+        return false; // Break loop
+      }
+    });
+    
+    // Try meta tags for image
+    if (!imageUrl) {
+      imageUrl = $('meta[property="og:image"]').attr('content') || 
+                 $('meta[name="twitter:image"]').attr('content');
+    }
+    
+    return {
+      title: title.substring(0, 100),
+      imageUrl: imageUrl || null,
+      url: postUrl
+    };
+    
+  } catch (error) {
+    console.error(`Error fetching post meta ${postUrl}:`, error.message);
+    return {
+      title: 'Buildin Post',
+      imageUrl: null,
+      url: postUrl
+    };
+  }
+}
+
+// Create Discord embed from post metadata
+function buildEmbedFromBuildinPost(meta) {
   const embed = new EmbedBuilder()
-    .setTitle(meta.title || 'Buildin Page')
+    .setTitle(meta.title || 'Buildin Post')
     .setURL(meta.url)
-    .setDescription('Новая запись на Buildin')
     .setColor('#00D4AA')
-    .setTimestamp(new Date(meta.updatedAt || Date.now()))
+    .setTimestamp(new Date())
     .setFooter({ text: 'Buildin.ai' });
+  
+  if (meta.imageUrl) {
+    embed.setImage(meta.imageUrl);
+  }
+  
   return embed;
 }
 
+// Main Buildin checker function
 async function checkBuildinFeeds() {
   const now = new Date();
   const guilds = await Guild.find({ 'settings.buildinFeeds.0': { $exists: true } });
+  
   for (const guildDoc of guilds) {
     const guild = client.guilds.cache.get(guildDoc.guildId);
     if (!guild) continue;
 
-    let changed = false;
+    let guildChanged = false;
 
     for (const feed of guildDoc.settings.buildinFeeds) {
       try {
         if (!feed.enabled) continue;
+        
         const intervalMs = (feed.interval || 5) * 60 * 1000;
         const lastCheck = feed.lastCheck ? new Date(feed.lastCheck) : new Date(0);
-        if (now - lastCheck < intervalMs) continue;
-
-        const pageId = extractPageId(feed.pageUrl) || feed.pageId;
-        if (!pageId) continue;
-
-        // Fetch latest page meta (placeholder)
-        const meta = await fetchBuildinPageMeta(pageId);
-
-        // Check duplicates by meta.id (could be improved to per-post granularity if Buildin exposes posts)
-        const alreadyPosted = (feed.lastPostedIds || []).includes(meta.id);
-        if (!alreadyPosted) {
-          const channel = guild.channels.cache.get(feed.channelId);
-          if (channel) {
-            const embed = buildEmbedFromBuildin(meta);
+        const shouldCheck = now - lastCheck >= intervalMs;
+        
+        const channel = guild.channels.cache.get(feed.channelId);
+        if (!channel) continue;
+        
+        // Handle initial backfill
+        if (!feed.backfilled && feed.initialBackfill > 0) {
+          console.log(`🚀 Starting backfill for ${feed.title || feed.pageId} (${feed.initialBackfill} posts)`);
+          
+          const posts = await fetchBuildinGalleryPosts(feed.pageUrl, feed.galleryFragment);
+          const postsToPublish = posts.slice(0, feed.initialBackfill).reverse(); // Oldest first
+          
+          for (const post of postsToPublish) {
+            if (feed.lastPostedIds && feed.lastPostedIds.includes(post.id)) continue;
+            
+            const postMeta = await fetchBuildinPostMeta(post.shareUrl || post.url);
+            const embed = buildEmbedFromBuildinPost(postMeta);
+            
             await channel.send({ embeds: [embed] });
-            console.log(`🚀 Posted Buildin update to ${guild.name}#${channel.name}`);
-
-            feed.lastPostedIds = Array.from(new Set([...(feed.lastPostedIds || []), meta.id])).slice(-50);
-            changed = true;
+            console.log(`🚀 Backfill posted: ${postMeta.title} to ${guild.name}#${channel.name}`);
+            
+            // Add to posted IDs
+            feed.lastPostedIds = feed.lastPostedIds || [];
+            feed.lastPostedIds.push(post.id);
+            
+            // Small delay between posts
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
+          
+          feed.backfilled = true;
+          feed.lastCheck = now;
+          guildChanged = true;
+          
+        } else if (shouldCheck) {
+          // Regular check for new posts
+          const posts = await fetchBuildinGalleryPosts(feed.pageUrl, feed.galleryFragment);
+          const newPosts = posts.filter(post => !(feed.lastPostedIds || []).includes(post.id));
+          
+          for (const post of newPosts.slice(0, 3)) { // Limit to 3 new posts per check
+            const postMeta = await fetchBuildinPostMeta(post.shareUrl || post.url);
+            const embed = buildEmbedFromBuildinPost(postMeta);
+            
+            await channel.send({ embeds: [embed] });
+            console.log(`🚀 Posted new Buildin post: ${postMeta.title} to ${guild.name}#${channel.name}`);
+            
+            // Add to posted IDs (keep last 200)
+            feed.lastPostedIds = feed.lastPostedIds || [];
+            feed.lastPostedIds.push(post.id);
+            if (feed.lastPostedIds.length > 200) {
+              feed.lastPostedIds = feed.lastPostedIds.slice(-200);
+            }
+            
+            // Small delay between posts
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          feed.lastCheck = now;
+          guildChanged = true;
         }
-        feed.lastCheck = now;
-      } catch (e) {
-        console.error(`Buildin feed error (guild ${guildDoc.guildId}):`, e.message);
+        
+      } catch (error) {
+        console.error(`Buildin feed error (guild ${guildDoc.guildId}, feed ${feed.title}):`, error.message);
       }
     }
 
-    if (changed) {
-      try { await guildDoc.save(); } catch (e) { console.error('Failed to save guildDoc after Buildin:', e.message); }
+    if (guildChanged) {
+      try {
+        await guildDoc.save();
+      } catch (error) {
+        console.error('Failed to save guild after Buildin updates:', error.message);
+      }
     }
   }
 }
 
-// Error handling & graceful shutdown:
+// Error handling & graceful shutdown
 client.on('error', error => { console.error('Discord client error:', error); });
 process.on('unhandledRejection', error => { console.error('Unhandled promise rejection:', error); });
 process.on('SIGINT', async () => {
