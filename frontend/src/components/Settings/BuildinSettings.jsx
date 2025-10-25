@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { buildin, guild } from '../../services/api';
-import { FaRocket, FaPlus, FaTimes, FaPlay, FaSpinner, FaExternalLinkAlt, FaCheck } from 'react-icons/fa';
+import { FaRocket, FaPlus, FaTimes, FaPlay, FaSpinner, FaExternalLinkAlt, FaCheck, FaClock, FaCheckCircle } from 'react-icons/fa';
 
 function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
   const [feeds, setFeeds] = useState([]);
@@ -45,11 +45,9 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
 
   const extractPageId = (url) => {
     if (!url) return null;
-    // If it's already a UUID
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url)) {
       return url;
     }
-    // Extract from URL
     const match = url.match(/buildin\.ai\/(?:[^/]+\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
     return match ? match[1] : null;
   };
@@ -127,7 +125,7 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
   const formatLastCheck = (date) => {
     if (!date) return 'Никогда';
     const now = new Date();
-    const diff = Math.floor((now - new Date(date)) / (1000 * 60)); // минут
+    const diff = Math.floor((now - new Date(date)) / (1000 * 60));
     if (diff < 1) return 'Менее минуты назад';
     if (diff < 60) return `${diff} мин. назад`;
     const hours = Math.floor(diff / 60);
@@ -136,8 +134,8 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
 
   if (loading) {
     return (
-      <div className="settings-panel" style={{ textAlign: 'center', padding: '2rem' }}>
-        <FaSpinner style={{ animation: 'spin 1s linear infinite', fontSize: '2rem', color: '#5865F2' }} />
+      <div className="loading">
+        <FaSpinner className="loading-spinner" />
         <p>Загрузка Buildin интеграций...</p>
       </div>
     );
@@ -145,42 +143,35 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
 
   if (error) {
     return (
-      <div className="settings-panel">
-        <div className="error-message">
-          <h3>⚠️ Ошибка загрузки</h3>
-          <p>{error}</p>
-          <button onClick={loadData} style={{ marginTop: '0.5rem' }}>
-            🔄 Попробовать снова
-          </button>
-        </div>
+      <div className="alert alert-error">
+        <h3>⚠️ Ошибка загрузки</h3>
+        <p>{error}</p>
+        <button onClick={loadData} className="btn-primary" style={{ marginTop: 'var(--space-md)' }}>
+          🔄 Попробовать снова
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="settings-panel">
-      <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <FaRocket style={{ color: '#00d4aa' }} /> Buildin.ai Интеграция
-        </h2>
-        <p style={{ color: '#b9bbbe', marginBottom: '1.5rem' }}>
-          Автоматически публикуйте новые записи с ваших страниц Buildin.ai в Discord каналы
+    <div className="settings-panel fade-in">
+      <div style={{ marginBottom: 'var(--space-2xl)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+          <FaRocket style={{ color: 'var(--success)', fontSize: '1.5rem' }} />
+          <h2 className="text-gradient">Buildin.ai Интеграция</h2>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-xl)', lineHeight: '1.6' }}>
+          Автоматически публикуйте новые записи с ваших страниц Buildin.ai в Discord каналы с красивыми embed-сообщениями
         </p>
         
-        {/* Кнопка добавления */}
         <button 
           onClick={() => setShowAddForm(!showAddForm)}
+          className={showAddForm ? 'btn-secondary' : 'btn-success'}
           style={{
-            background: showAddForm ? '#666' : '#00d4aa',
-            color: 'white',
-            border: 'none',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '1rem'
+            gap: 'var(--space-sm)',
+            marginBottom: 'var(--space-lg)'
           }}
         >
           {showAddForm ? <FaTimes /> : <FaPlus />}
@@ -188,77 +179,43 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
         </button>
       </div>
 
-      {/* Форма добавления */}
       {showAddForm && (
-        <div style={{
-          background: 'rgba(0, 212, 170, 0.1)',
-          border: '1px solid #00d4aa',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <h3 style={{ marginBottom: '1rem', color: '#00d4aa' }}>✨ Новая Buildin интеграция</h3>
+        <div className="buildin-form fade-in">
+          <h3 style={{ marginBottom: 'var(--space-xl)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+            ✨ Новая Buildin интеграция
+          </h3>
           
-          <div className="form-grid" style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
-            <div>
-              <label>Ссылка на страницу/галерею Buildin.ai:</label>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Ссылка на страницу/галерею Buildin.ai</label>
               <input
                 type="text"
                 placeholder="https://buildin.ai/..."
                 value={newFeed.pageUrl}
                 onChange={(e) => setNewFeed({...newFeed, pageUrl: e.target.value})}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#40444b',
-                  border: '1px solid #72767d',
-                  borderRadius: '4px',
-                  color: '#ffffff'
-                }}
               />
               {newFeed.pageUrl && extractPageId(newFeed.pageUrl) && (
-                <small style={{ color: '#00d4aa', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <small style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
                   <FaCheck /> Page ID: {extractPageId(newFeed.pageUrl)}
                 </small>
               )}
             </div>
             
-            <div>
-              <label>Название (опционально):</label>
+            <div className="form-group">
+              <label>Название (опционально)</label>
               <input
                 type="text"
                 placeholder="Мои посты на Buildin"
                 value={newFeed.title}
                 onChange={(e) => setNewFeed({...newFeed, title: e.target.value})}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#40444b',
-                  border: '1px solid #72767d',
-                  borderRadius: '4px',
-                  color: '#ffffff'
-                }}
               />
             </div>
             
-            <div>
-              <label>Discord канал:</label>
+            <div className="form-group">
+              <label>Discord канал</label>
               <select
                 value={newFeed.channelId}
                 onChange={(e) => setNewFeed({...newFeed, channelId: e.target.value})}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#40444b',
-                  border: '1px solid #72767d',
-                  borderRadius: '4px',
-                  color: '#ffffff'
-                }}
               >
                 <option value="">Выберите канал</option>
                 {channels.filter(c => [0, 5].includes(c.type)).map(channel => (
@@ -269,38 +226,22 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
               </select>
             </div>
             
-            <div>
-              <label>Интервал проверки (минуты):</label>
+            <div className="form-group">
+              <label>Интервал проверки (минуты)</label>
               <input
                 type="number"
                 min="1"
                 max="60"
                 value={newFeed.interval}
                 onChange={(e) => setNewFeed({...newFeed, interval: e.target.value})}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#40444b',
-                  border: '1px solid #72767d',
-                  borderRadius: '4px',
-                  color: '#ffffff'
-                }}
               />
             </div>
             
-            <div>
-              <label>Опубликовать сразу (количество предыдущих постов):</label>
+            <div className="form-group">
+              <label>Опубликовать сразу (количество предыдущих постов)</label>
               <select
                 value={newFeed.initialBackfill}
                 onChange={(e) => setNewFeed({...newFeed, initialBackfill: parseInt(e.target.value)})}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#40444b',
-                  border: '1px solid #72767d',
-                  borderRadius: '4px',
-                  color: '#ffffff'
-                }}
               >
                 <option value={0}>Не публиковать предыдущие посты</option>
                 <option value={1}>1 пост</option>
@@ -309,30 +250,21 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
                 <option value={10}>10 постов</option>
                 <option value={20}>20 постов</option>
               </select>
-              <small style={{ color: '#b9bbbe', display: 'block', marginTop: '0.25rem' }}>
-                После создания бот опубликует эти посты с галереи
-              </small>
+              <small>После создания бот опубликует эти посты с галереи</small>
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-lg)', alignItems: 'center', marginTop: 'var(--space-xl)' }}>
             <button 
               onClick={handleAddFeed} 
               disabled={saving}
-              style={{
-                background: '#00d4aa',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '6px',
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.6 : 1
-              }}
+              className="btn-success"
+              style={{ opacity: saving ? 0.6 : 1 }}
             >
               {saving ? '💾 Сохранение...' : '➕ Добавить'}
             </button>
             
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={newFeed.enabled}
@@ -344,83 +276,118 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
         </div>
       )}
 
-      {/* Список существующих интеграций */}
       <div>
-        <h3>Настроенные интеграции ({feeds.length})</h3>
+        <h3 style={{ marginBottom: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+          Настроенные интеграции 
+          <span style={{ 
+            background: 'var(--bg-tertiary)', 
+            padding: 'var(--space-xs) var(--space-sm)', 
+            borderRadius: 'var(--radius-sm)', 
+            fontSize: '0.8rem',
+            color: 'var(--text-secondary)'
+          }}>
+            {feeds.length}
+          </span>
+        </h3>
         
         {feeds.length === 0 ? (
-          <div style={{
+          <div className="buildin-card" style={{
             textAlign: 'center',
-            padding: '3rem 1rem',
-            color: '#72767d',
-            background: 'rgba(114, 118, 125, 0.1)',
-            borderRadius: '8px',
-            marginTop: '1rem'
+            padding: 'var(--space-2xl)',
+            opacity: 0.7
           }}>
-            <FaRocket style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }} />
-            <p>Нет настроенных Buildin интеграций</p>
-            <p style={{ fontSize: '0.9rem' }}>Добавьте первую для начала автоматической публикации</p>
+            <FaRocket style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-lg)' }} />
+            <h4 style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>Нет настроенных Buildin интеграций</h4>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Добавьте первую для начала автоматической публикации</p>
           </div>
         ) : (
-          <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-lg)' }}>
             {feeds.map((feed) => {
               const channel = getChannelById(feed.channelId);
               return (
-                <div
-                  key={feed._id}
-                  style={{
-                    background: feed.enabled ? '#2c2f33' : 'rgba(44, 47, 51, 0.5)',
-                    border: `1px solid ${feed.enabled ? '#40444b' : '#72767d'}`,
-                    borderRadius: '8px',
-                    padding: '1.5rem',
-                    marginBottom: '1rem',
-                    opacity: feed.enabled ? 1 : 0.7
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                <div key={feed._id} className="buildin-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-lg)' }}>
                     <div style={{ flex: 1 }}>
-                      <h4 style={{ color: '#00d4aa', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FaRocket />
-                        {feed.title || 'Без названия'}
-                        {!feed.enabled && <span style={{ color: '#faa61a', fontSize: '0.8rem' }}>(Неактивно)</span>}
-                      </h4>
-                      <div style={{ fontSize: '0.9rem', color: '#b9bbbe' }}>
-                        <p><strong>Страница:</strong> 
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+                        <FaRocket style={{ color: 'var(--success)' }} />
+                        <h4 style={{ color: 'var(--text-primary)' }}>{feed.title || 'Без названия'}</h4>
+                        {!feed.enabled && (
+                          <span style={{ 
+                            color: 'var(--warning)', 
+                            fontSize: '0.8rem',
+                            background: 'rgba(245, 166, 35, 0.1)',
+                            padding: 'var(--space-xs) var(--space-sm)',
+                            borderRadius: 'var(--radius-sm)'
+                          }}>Неактивно</span>
+                        )}
+                        <span className={`buildin-status ${feed.backfilled ? 'completed' : 'pending'}`}>
+                          {feed.backfilled ? <FaCheckCircle /> : <FaClock />}
+                          {feed.backfilled ? 'Готово' : 'Ожидание'}
+                        </span>
+                      </div>
+                      
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                        gap: 'var(--space-md)',
+                        fontSize: '0.875rem',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        <div>
+                          <strong style={{ color: 'var(--text-primary)' }}>Страница:</strong>
+                          <br />
                           <a 
                             href={feed.pageUrl} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            style={{ color: '#00d4aa', textDecoration: 'none', marginLeft: '0.25rem' }}
+                            style={{ 
+                              color: 'var(--success)', 
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-xs)',
+                              fontSize: '0.8rem'
+                            }}
                           >
-                            {feed.pageUrl} <FaExternalLinkAlt style={{ fontSize: '0.7rem' }} />
+                            {feed.pageUrl.length > 50 ? feed.pageUrl.substring(0, 50) + '...' : feed.pageUrl}
+                            <FaExternalLinkAlt />
                           </a>
-                        </p>
-                        <p><strong>Канал:</strong> {channel ? `#${channel.name}` : `ID: ${feed.channelId} (канал не найден)`}</p>
-                        <p><strong>Интервал:</strong> {feed.interval} мин. | <strong>Последняя проверка:</strong> {formatLastCheck(feed.lastCheck)}</p>
-                        <p><strong>Опубликовано:</strong> {feed.lastPostedIds?.length || 0} записей</p>
-                        <p><strong>Первичная публикация:</strong> 
-                          <span style={{ color: feed.backfilled ? '#43b581' : '#faa61a', marginLeft: '0.25rem' }}>
-                            {feed.backfilled ? 'выполнена' : 'ожидание'} ({feed.initialBackfill || 0} постов)
-                          </span>
-                        </p>
+                        </div>
+                        
+                        <div>
+                          <strong style={{ color: 'var(--text-primary)' }}>Канал:</strong>
+                          <br />
+                          {channel ? `#${channel.name}` : `ID: ${feed.channelId} (канал не найден)`}
+                        </div>
+                        
+                        <div>
+                          <strong style={{ color: 'var(--text-primary)' }}>Настройки:</strong>
+                          <br />
+                          Каждые {feed.interval} мин. • {feed.lastPostedIds?.length || 0} записей
+                        </div>
+                        
+                        <div>
+                          <strong style={{ color: 'var(--text-primary)' }}>Статус:</strong>
+                          <br />
+                          Последняя проверка: {formatLastCheck(feed.lastCheck)}
+                          <br />
+                          Первичная публикация: {feed.initialBackfill || 0} постов
+                        </div>
                       </div>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-sm)', flexShrink: 0, marginLeft: 'var(--space-lg)' }}>
                       <button
                         onClick={() => handleTestFeed(feed)}
                         disabled={testing === feed._id}
+                        className="btn-primary"
                         style={{
-                          background: '#5865F2',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '4px',
-                          cursor: testing === feed._id ? 'not-allowed' : 'pointer',
                           opacity: testing === feed._id ? 0.6 : 1,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.25rem'
+                          gap: 'var(--space-xs)',
+                          fontSize: '0.8rem',
+                          padding: 'var(--space-sm) var(--space-md)'
                         }}
                         title="Проверить сейчас"
                       >
@@ -430,13 +397,10 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
                       
                       <button
                         onClick={() => handleDeleteFeed(feed._id)}
+                        className="btn-error"
                         style={{
-                          background: '#f04747',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
+                          fontSize: '0.8rem',
+                          padding: 'var(--space-sm) var(--space-md)'
                         }}
                         title="Удалить интеграцию"
                       >
@@ -451,20 +415,19 @@ function BuildinSettings({ guildId, settings: guildSettings, onUpdate }) {
         )}
       </div>
 
-      {/* Инструкции */}
-      <div style={{
-        background: 'rgba(88, 101, 242, 0.1)',
-        border: '1px solid #5865F2',
-        borderRadius: '8px',
-        padding: '1rem',
-        marginTop: '2rem'
+      <div className="alert" style={{
+        background: 'rgba(0, 112, 243, 0.1)',
+        border: '1px solid var(--primary)',
+        marginTop: 'var(--space-2xl)'
       }}>
-        <h4 style={{ color: '#5865F2', marginBottom: '0.5rem' }}>📚 Как настроить:</h4>
-        <ol style={{ fontSize: '0.9rem', lineHeight: '1.5', color: '#b9bbbe' }}>
-          <li>Откройте страницу/галерею на Buildin.ai, которую хотите транслировать</li>
-          <li>Скопируйте URL страницы (с #fragment для галерей) в поле выше</li>
-          <li>Выберите Discord канал для публикации</li>
-          <li>Укажите интервал проверки (1-60 минут) и количество предыдущих постов</li>
+        <h4 style={{ color: 'var(--primary)', marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+          📚 Как настроить
+        </h4>
+        <ol style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-secondary)', paddingLeft: 'var(--space-lg)' }}>
+          <li style={{ marginBottom: 'var(--space-xs)' }}>Откройте страницу/галерею на Buildin.ai, которую хотите транслировать</li>
+          <li style={{ marginBottom: 'var(--space-xs)' }}>Скопируйте URL страницы (с #fragment для галерей) в поле выше</li>
+          <li style={{ marginBottom: 'var(--space-xs)' }}>Выберите Discord канал для публикации</li>
+          <li style={{ marginBottom: 'var(--space-xs)' }}>Укажите интервал проверки (1-60 минут) и количество предыдущих постов</li>
           <li>Нажмите "Добавить" — бот опубликует посты с названиями и обложками</li>
         </ol>
       </div>
