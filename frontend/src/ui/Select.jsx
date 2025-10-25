@@ -1,94 +1,26 @@
 import React from 'react';
-import './Select.css';
-import { FaChevronDown } from 'react-icons/fa';
+import { cn } from '../utils/cn';
 
-const Select = ({
-  label,
-  id,
-  value,
-  onChange,
-  options = [],
-  placeholder = "Выберите опцию",
-  disabled = false,
-  error = false,
-  success = false,
-  helperText,
-  errorText,
-  size = 'md',
-  fullWidth = false,
-  className = '',
-  required = false,
-  ...props
-}) => {
-  const selectId = id || `select-${Math.random().toString(36).substr(2, 9)}`;
-  const hasError = error || errorText;
-  const hasSuccess = success && !hasError;
-  
-  const selectClasses = [
-    'select',
-    `select--${size}`,
-    hasError && 'select--error',
-    hasSuccess && 'select--success',
-    disabled && 'select--disabled',
-    fullWidth && 'select--full-width',
-    className
-  ].filter(Boolean).join(' ');
-  
-  const wrapperClasses = [
-    'select-wrapper',
-    fullWidth && 'select-wrapper--full-width'
-  ].filter(Boolean).join(' ');
-
+const Select = React.forwardRef(({ className, label, description, error, children, ...props }, ref) => {
   return (
-    <div className={wrapperClasses}>
-      {label && (
-        <label htmlFor={selectId} className="select-label">
-          {label}
-          {required && <span className="select-label__required">*</span>}
-        </label>
-      )}
-      
-      <div className="select-container">
-        <select
-          id={selectId}
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          className={selectClasses}
-          required={required}
-          aria-invalid={hasError ? 'true' : 'false'}
-          aria-describedby={
-            (helperText || errorText) ? `${selectId}-help` : undefined
-          }
-          {...props}
-        >
-          {placeholder && (
-            <option value="" disabled>
-              {placeholder}
-            </option>
-          )}
-          {options.map((option, index) => (
-            <option key={option.value || index} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+    <div className="w-full">
+      {label && <label className="block text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">{label}</label>}
+      <div className="relative">
+        <select ref={ref} {...props}
+          className={cn(
+            "block w-full appearance-none px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-10",
+            error && "border-red-300 focus:ring-red-500", className)}>
+          {children}
         </select>
-        
-        <span className="select-icon" aria-hidden="true">
-          <FaChevronDown />
-        </span>
-      </div>
-      
-      {(helperText || errorText) && (
-        <div 
-          id={`${selectId}-help`} 
-          className={`select-help ${hasError ? 'select-help--error' : ''}`}
-        >
-          {errorText || helperText}
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
         </div>
-      )}
+      </div>
+      {description && !error && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{description}</p>}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
-};
+});
 
+Select.displayName = 'Select';
 export default Select;
