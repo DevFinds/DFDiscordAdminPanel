@@ -1,91 +1,16 @@
 import React from 'react';
-import './Checkbox.css';
-import { FaCheck } from 'react-icons/fa';
+import { cn } from '../utils/cn';
 
-const Checkbox = ({
-  label,
-  id,
-  checked = false,
-  onChange,
-  disabled = false,
-  indeterminate = false,
-  error = false,
-  helperText,
-  errorText,
-  size = 'md',
-  className = '',
-  required = false,
-  ...props
-}) => {
-  const checkboxId = id || `checkbox-${Math.random().toString(36).substr(2, 9)}`;
-  const hasError = error || errorText;
-  
-  const checkboxClasses = [
-    'checkbox',
-    `checkbox--${size}`,
-    hasError && 'checkbox--error',
-    disabled && 'checkbox--disabled',
-    indeterminate && 'checkbox--indeterminate',
-    className
-  ].filter(Boolean).join(' ');
-  
-  const wrapperClasses = [
-    'checkbox-wrapper',
-    disabled && 'checkbox-wrapper--disabled'
-  ].filter(Boolean).join(' ');
-
-  const handleChange = (e) => {
-    if (disabled) return;
-    onChange?.(e);
-  };
-
+const Checkbox = ({ className, label, description, error, ...props }) => {
   return (
-    <div className="checkbox-field">
-      <label className={wrapperClasses}>
-        <div className="checkbox-container">
-          <input
-            id={checkboxId}
-            type="checkbox"
-            checked={checked}
-            onChange={handleChange}
-            disabled={disabled}
-            className="checkbox-input sr-only"
-            required={required}
-            aria-invalid={hasError ? 'true' : 'false'}
-            aria-describedby={
-              (helperText || errorText) ? `${checkboxId}-help` : undefined
-            }
-            {...props}
-          />
-          
-          <div className={checkboxClasses}>
-            <div className="checkbox-indicator">
-              {indeterminate ? (
-                <div className="checkbox-indeterminate-line" />
-              ) : (
-                <FaCheck className="checkbox-check" aria-hidden="true" />
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {label && (
-          <span className="checkbox-label">
-            {label}
-            {required && <span className="checkbox-label__required">*</span>}
-          </span>
-        )}
-      </label>
-      
-      {(helperText || errorText) && (
-        <div 
-          id={`${checkboxId}-help`} 
-          className={`checkbox-help ${hasError ? 'checkbox-help--error' : ''}`}
-        >
-          {errorText || helperText}
-        </div>
-      )}
-    </div>
+    <label className={cn("flex items-start gap-3 cursor-pointer select-none", className)}>
+      <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" {...props} />
+      <span>
+        {label && <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</span>}
+        {description && <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>}
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </span>
+    </label>
   );
 };
 
