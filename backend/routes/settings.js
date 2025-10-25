@@ -2,12 +2,91 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth');
 const Guild = require('../models/Guild');
 const User = require('../models/User');
+const axios = require('axios');
 const router = express.Router();
 
 const verifyAccess = async (userId, guildId) => {
   const user = await User.findById(userId);
   return user.guilds.some(g => g.id === guildId);
 };
+
+// Get guild roles from Discord API
+router.get('/:guildId/roles', verifyToken, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get roles from Discord API using bot token
+    const response = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
+    });
+
+    // Filter out @everyone role and sort by position
+    const roles = response.data
+      .filter(role => role.name !== '@everyone')
+      .sort((a, b) => b.position - a.position)
+      .map(role => ({
+        id: role.id,
+        name: role.name,
+        color: role.color,
+        position: role.position,
+        permissions: role.permissions,
+        mentionable: role.mentionable,
+        managed: role.managed
+      }));
+
+    res.json({ roles });
+  } catch (err) {
+    console.error('Error fetching guild roles:', err.response?.data || err.message);
+    if (err.response?.status === 403) {
+      return res.status(403).json({ error: 'Bot lacks permissions to view roles' });
+    }
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+});
+
+// Get guild channels from Discord API
+router.get('/:guildId/channels', verifyToken, async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    
+    if (!await verifyAccess(req.userId, guildId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get channels from Discord API using bot token
+    const response = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
+    });
+
+    // Filter and organize channels by type
+    const channels = response.data
+      .filter(channel => [0, 2, 5, 13].includes(channel.type)) // Text, Voice, News, Stage
+      .sort((a, b) => a.position - b.position)
+      .map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        position: channel.position,
+        parentId: channel.parent_id
+      }));
+
+    res.json({ channels });
+  } catch (err) {
+    console.error('Error fetching guild channels:', err.response?.data || err.message);
+    if (err.response?.status === 403) {
+      return res.status(403).json({ error: 'Bot lacks permissions to view channels' });
+    }
+    res.status(500).json({ error: 'Failed to fetch channels' });
+  }
+});
 
 // Welcome settings
 router.put('/:guildId/welcome', verifyToken, async (req, res) => {
