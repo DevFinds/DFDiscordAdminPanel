@@ -1,96 +1,23 @@
 import React from 'react';
-import './Input.css';
+import { cn } from '../utils/cn';
 
-const Input = ({
-  label,
-  id,
-  type = 'text',
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-  error = false,
-  success = false,
-  helperText,
-  errorText,
-  size = 'md',
-  fullWidth = false,
-  leftIcon = null,
-  rightIcon = null,
-  className = '',
-  required = false,
-  ...props
-}) => {
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
-  const hasError = error || errorText;
-  const hasSuccess = success && !hasError;
-  
-  const inputClasses = [
-    'input',
-    `input--${size}`,
-    hasError && 'input--error',
-    hasSuccess && 'input--success',
-    disabled && 'input--disabled',
-    leftIcon && 'input--has-left-icon',
-    rightIcon && 'input--has-right-icon',
-    fullWidth && 'input--full-width',
-    className
-  ].filter(Boolean).join(' ');
-  
-  const wrapperClasses = [
-    'input-wrapper',
-    fullWidth && 'input-wrapper--full-width'
-  ].filter(Boolean).join(' ');
-
+const Input = React.forwardRef(({ className, label, description, error, leftIcon, rightIcon, ...props }, ref) => {
   return (
-    <div className={wrapperClasses}>
-      {label && (
-        <label htmlFor={inputId} className="input-label">
-          {label}
-          {required && <span className="input-label__required">*</span>}
-        </label>
-      )}
-      
-      <div className="input-container">
-        {leftIcon && (
-          <span className="input-icon input-icon--left" aria-hidden="true">
-            {leftIcon}
-          </span>
-        )}
-        
-        <input
-          id={inputId}
-          type={type}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={inputClasses}
-          required={required}
-          aria-invalid={hasError ? 'true' : 'false'}
-          aria-describedby={
-            (helperText || errorText) ? `${inputId}-help` : undefined
-          }
-          {...props}
-        />
-        
-        {rightIcon && (
-          <span className="input-icon input-icon--right" aria-hidden="true">
-            {rightIcon}
-          </span>
-        )}
+    <div className="w-full">
+      {label && <label className="block text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">{label}</label>}
+      <div className="relative">
+        {leftIcon && <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">{leftIcon}</div>}
+        <input ref={ref} {...props}
+          className={cn(
+            "block w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all",
+            leftIcon && "pl-10", rightIcon && "pr-10", error && "border-red-300 focus:ring-red-500", className)} />
+        {rightIcon && <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">{rightIcon}</div>}
       </div>
-      
-      {(helperText || errorText) && (
-        <div 
-          id={`${inputId}-help`} 
-          className={`input-help ${hasError ? 'input-help--error' : ''}`}
-        >
-          {errorText || helperText}
-        </div>
-      )}
+      {description && !error && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{description}</p>}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
-};
+});
 
+Input.displayName = 'Input';
 export default Input;
