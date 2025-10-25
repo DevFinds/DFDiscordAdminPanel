@@ -52,6 +52,29 @@ const GuildSchema = new mongoose.Schema({
         type: Boolean,
         default: true
       }
+    }],
+    buildinFeeds: [{
+      pageId: String,
+      pageUrl: String,
+      channelId: String,
+      interval: {
+        type: Number,
+        default: 5
+      },
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      lastCheck: Date,
+      lastPostedIds: {
+        type: [String],
+        default: []
+      },
+      title: String,
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
     }]
   },
   createdAt: {
