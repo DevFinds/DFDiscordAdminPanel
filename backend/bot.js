@@ -21,14 +21,41 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('🤖 Bot connected to MongoDB'))
   .catch(err => console.error('Bot MongoDB error:', err));
 
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
   console.log(`📊 Serving ${client.guilds.cache.size} servers`);
-  cron.schedule('*/10 * * * *', () => {
-    checkRSSFeeds();
-  });
-  console.log('🔄 RSS feed checker scheduled (every 10 minutes)');
+
+  for (const [guildId, guild] of client.guilds.cache) {
+    let exists = await Guild.findOne({ guildId });
+    if (!exists) {
+      await Guild.create({
+        guildId,
+        name: guild.name,
+        icon: guild.icon,
+        ownerId: guild.ownerId || (await guild.fetchOwner()).id,
+        settings: {}
+      });
+      console.log(`🗃 Guild "${guild.name}" [${guildId}] добавлен в MongoDB`);
+    }
+  }
 });
+
+client.on('guildCreate', async (guild) => {
+  let exists = await Guild.findOne({ guildId: guild.id });
+  if (!exists) {
+    await Guild.create({
+      guildId: guild.id,
+      name: guild.name,
+      icon: guild.icon,
+      ownerId: guild.ownerId || (await guild.fetchOwner()).id,
+      settings: {}
+    });
+    console.log(`🗃 Guild "${guild.name}" [${guild.id}] добавлен в MongoDB (guildCreate)`);
+  }
+});
+
+
+
 
 client.on('guildMemberAdd', async (member) => {
   try {
