@@ -5,6 +5,9 @@ services:
     restart: always
     ports:
       - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=discord-dashboard
+    command: ["mongod", "--bind_ip_all", "--auth"]
     volumes:
       - mongo_data:/data/db
 
@@ -45,6 +48,8 @@ services:
     build: ../../frontend
     ports:
       - "3000:80"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:5000}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
