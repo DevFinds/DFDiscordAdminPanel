@@ -23,7 +23,9 @@ export const auth = {
 
 export const servers = {
   getAll: () => api.get('/api/servers'),
-  getOne: (guildId) => api.get(`/api/servers/${guildId}`)
+  getOne: (guildId) => api.get(`/api/servers/${guildId}`),
+  getStats: (guildId) => api.get(`/api/servers/${guildId}/stats`),
+  getAnalytics: (guildId, period = '7d') => api.get(`/api/servers/${guildId}/analytics?period=${period}`)
 };
 
 export const guild = {
