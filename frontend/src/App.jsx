@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import ModernDashboard from './components/ModernDashboard';
+import ServerDashboard from './components/ServerDashboard';
 import ServerSettings from './pages/ServerSettings';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { auth } from './services/api';
@@ -109,6 +110,11 @@ function App() {
             
             <Route 
               path="/server/:guildId" 
+              element={user ? <ServerDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
+            />
+            
+            <Route 
+              path="/server/:guildId/settings" 
               element={user ? <ServerSettings /> : <Navigate to="/login" replace />} 
             />
             
