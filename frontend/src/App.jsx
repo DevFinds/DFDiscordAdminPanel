@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
-import Dashboard from './components/Dashboard';
+import ModernDashboard from './components/ModernDashboard';
 import ServerSettings from './pages/ServerSettings';
-import Navbar from './components/Navbar';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { auth } from './services/api';
 
@@ -57,14 +56,14 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center transition-colors duration-200">
-        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-xl max-w-md w-full mx-4 border border-slate-200 dark:border-slate-700">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center transition-colors duration-200">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-xl max-w-md w-full mx-4 border border-gray-200 dark:border-gray-800">
           <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-pulse">
+            <div className="w-16 h-16 bg-gradient-to-br from-discord-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-pulse">
               <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Загрузка приложения...</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Проверяем авторизацию</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Загрузка приложения...</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Проверяем авторизацию</p>
           </div>
         </div>
       </div>
@@ -74,12 +73,10 @@ function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-          {user && <Navbar user={user} onLogout={handleLogout} />}
-          
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
           {/* Error display */}
           {authError && !user && (
-            <div className="mx-4 mt-4">
+            <div className="mx-4 pt-4">
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 max-w-md mx-auto">
                 <div className="flex-shrink-0 w-6 h-6 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center">
                   <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -107,7 +104,7 @@ function App() {
             
             <Route 
               path="/dashboard" 
-              element={user ? <Dashboard user={user} /> : <Navigate to="/login" replace />} 
+              element={user ? <ModernDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
             />
             
             <Route 
